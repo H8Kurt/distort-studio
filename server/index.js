@@ -6,6 +6,9 @@ const { Sequelize } = require('sequelize');
 
 const app = express();
 app.use(express.json());
+const userRoutes = require('./routes/users');
+app.use('/api/users', userRoutes);
+
 
 // создаём подключение Sequelize, берём параметры из .env
 const sequelize = new Sequelize(
