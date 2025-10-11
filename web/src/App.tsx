@@ -1,36 +1,81 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-      <h1 className="text-4xl font-bold text-center text-purple-600">Distort Studio</h1>
-    </>
-  )
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
 }
 
-export default App
+function App() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+
+  // Загружаем список пользователей
+  const fetchUsers = async () => {
+    const res = await fetch("http://localhost:4000/api/users");
+    const data = await res.json();
+    setUsers(data);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Добавляем пользователя
+  const addUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch("http://localhost:4000/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, email }),
+    });
+    setUsername("");
+    setEmail("");
+    fetchUsers(); // обновляем список
+  };
+
+  return (
+    <div className="p-8 text-center">
+      <h1 className="text-3xl font-bold text-purple-600 mb-4">
+        Distort Studio Users
+      </h1>
+
+      <form onSubmit={addUser} className="mb-6 space-x-2">
+        <input
+          className="border border-gray-400 p-2 rounded"
+          type="text"
+          placeholder="Имя"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+        <input
+          className="border border-gray-400 p-2 rounded"
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <button
+          type="submit"
+          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+        >
+          Добавить
+        </button>
+      </form>
+
+      <ul className="space-y-2">
+        {users.map((u) => (
+          <li key={u.id} className="bg-gray-800 text-white p-2 rounded-md">
+            {u.username} — {u.email}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default App;
