@@ -1,13 +1,17 @@
 require('dotenv').config();
+const path = require('path');            // ← обязательно
 const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// middleware
+// middleware общего назначения
 app.use(cors());
 app.use(express.json());
 
-// маршруты
+// статические файлы (отдаём загруженные файлы по /uploads/...)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// маршруты API
 const userRoutes = require('./routes/users');
 const projectRoutes = require('./routes/projects');
 const authRoutes = require('./routes/auth');
@@ -18,10 +22,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 
-// отдаём файлы из папки uploads
-app.use('/uploads', express.static('uploads'));
-
-// подключение к базе
+// подключение к БД
 const sequelize = require('./db');
 const User = require('./models/User');
 const Project = require('./models/Project');
@@ -37,4 +38,5 @@ app.get('/api/ping', (req, res) => {
 });
 
 // запуск сервера
-app.listen(4000, () => console.log('🚀 Server started on port 4000'));
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`🚀 Server started on port ${PORT}`));

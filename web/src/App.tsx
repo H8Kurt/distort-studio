@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { TrashIcon, PencilIcon } from "@heroicons/react/24/solid";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
+import UploadForm from "./UploadForm";
 
+// === Типы ===
 interface User {
   id: number;
   username: string;
@@ -17,6 +19,7 @@ interface Project {
   UserId: number;
 }
 
+// === Компонент ===
 function App() {
   // Авторизация
   const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
@@ -26,18 +29,12 @@ function App() {
   // Данные
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [uploads, setUploads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Новые данные для форм
   const [newUser, setNewUser] = useState({ username: "", email: "" });
   const [newProject, setNewProject] = useState({ title: "", description: "" });
-const uploadFile = async (file) => {
-  const fd = new FormData();
-  fd.append('file', file);
-  const token = localStorage.getItem('token');
-  const res = await fetch('http://localhost:4000/api/upload/file', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
-  return res.json();
-};
 
   // === Проверка токена ===
   const checkToken = async (t: string | null) => {
@@ -145,7 +142,8 @@ const uploadFile = async (file) => {
   };
 
   // === Загрузка ===
-  if (loading) return <div className="text-center text-white mt-20 text-2xl">Загрузка...</div>;
+  if (loading)
+    return <div className="text-center text-white mt-20 text-2xl">Загрузка...</div>;
 
   // === Если не авторизован ===
   if (!token || !currentUser) {
@@ -284,6 +282,23 @@ const uploadFile = async (file) => {
           </li>
         ))}
       </ul>
+
+      {/* === Загрузка файлов === */}
+      <div className="mt-10">
+        <h2 className="text-2xl font-semibold mb-4 text-white">Загрузка файлов</h2>
+        <UploadForm onUploaded={(m) => setUploads((prev) => [...prev, m])} />
+        {uploads.length > 0 && (
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {uploads.map((u, i) => (
+              <img
+                key={i}
+                src={`http://localhost:4000${u.thumb || u.url}`}
+                className="rounded shadow-lg"
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

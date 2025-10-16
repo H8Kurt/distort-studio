@@ -41,3 +41,7 @@ router.put('/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router.get('/:id', async (req,res)=>{
+  const project = await Project.findByPk(req.params.id, { include: [{ model: require('../models/Media') }]});
+  res.json(project);
+});
