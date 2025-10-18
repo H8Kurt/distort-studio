@@ -3,6 +3,9 @@ import { TrashIcon, PencilIcon } from "@heroicons/react/24/solid";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import UploadForm from "./UploadForm";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:4000");
 
 // === Типы ===
 interface User {
@@ -19,22 +22,33 @@ interface Project {
   UserId: number;
 }
 
+interface UploadFile {
+  name?: string;
+  url: string;
+  thumb?: string;
+}
+
 // === Компонент ===
 function App() {
   // Авторизация
-  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem("token")
+  );
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showRegister, setShowRegister] = useState(false);
 
   // Данные
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [uploads, setUploads] = useState<any[]>([]);
+  const [uploads, setUploads] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Новые данные для форм
   const [newUser, setNewUser] = useState({ username: "", email: "" });
-  const [newProject, setNewProject] = useState({ title: "", description: "" });
+  const [newProject, setNewProject] = useState({
+    title: "",
+    description: "",
+  });
 
   // === Проверка токена ===
   const checkToken = async (t: string | null) => {
@@ -76,9 +90,39 @@ function App() {
     setProjects(data);
   };
 
+  const fetchUploads = async () => {
+    try {
+      const res = await fetch("http://localhost:4000/api/upload/list", {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) throw new Error("Не удалось получить список файлов");
+      const data = await res.json();
+      setUploads(data);
+    } catch (err) {
+      console.error("Ошибка при загрузке списка файлов:", err);
+    }
+  };
+
+  // === При загрузке приложения ===
   useEffect(() => {
     if (token) checkToken(token);
-    Promise.all([fetchUsers(), fetchProjects()]).then(() => setLoading(false));
+    Promise.all([fetchUsers(), fetchProjects(), fetchUploads()]).then(() =>
+      setLoading(false)
+    );
+
+    // Реалтайм события
+    socket.on("project:created", (project) => {
+      setProjects((prev) => [...prev, project]);
+    });
+
+    socket.on("media:uploaded", (file) => {
+      if (file && file.url) setUploads((prev) => [...prev, file]);
+    });
+
+    return () => {
+      socket.off("project:created");
+      socket.off("media:uploaded");
+    };
   }, [token]);
 
   // === Добавление пользователя ===
@@ -132,7 +176,11 @@ function App() {
     fetchProjects();
   };
 
-  const editProject = async (id: number, newTitle: string, newDescription: string) => {
+  const editProject = async (
+    id: number,
+    newTitle: string,
+    newDescription: string
+  ) => {
     await fetch(`http://localhost:4000/api/projects/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -143,7 +191,9 @@ function App() {
 
   // === Загрузка ===
   if (loading)
-    return <div className="text-center text-white mt-20 text-2xl">Загрузка...</div>;
+    return (
+      <div className="text-center text-white mt-20 text-2xl">Загрузка...</div>
+    );
 
   // === Если не авторизован ===
   if (!token || !currentUser) {
@@ -222,7 +272,9 @@ function App() {
             key={u.id}
             className="bg-gray-800 p-3 rounded-lg flex justify-between items-center"
           >
-            <span>{u.username} — {u.email}</span>
+            <span>
+              {u.username} — {u.email}
+            </span>
             <TrashIcon
               className="w-5 h-5 text-red-500 cursor-pointer hover:scale-110"
               onClick={() => deleteUser(u.id)}
@@ -238,13 +290,17 @@ function App() {
           className="bg-gray-800 p-2 rounded text-white flex-1"
           placeholder="Название проекта"
           value={newProject.title}
-          onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
+          onChange={(e) =>
+            setNewProject({ ...newProject, title: e.target.value })
+          }
         />
         <input
           className="bg-gray-800 p-2 rounded text-white flex-1"
           placeholder="Описание"
           value={newProject.description}
-          onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+          onChange={(e) =>
+            setNewProject({ ...newProject, description: e.target.value })
+          }
         />
         <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
           Добавить проект
@@ -285,17 +341,34 @@ function App() {
 
       {/* === Загрузка файлов === */}
       <div className="mt-10">
-        <h2 className="text-2xl font-semibold mb-4 text-white">Загрузка файлов</h2>
-        <UploadForm onUploaded={(m) => setUploads((prev) => [...prev, m])} />
+        <h2 className="text-2xl font-semibold mb-4 text-white">
+          Загрузка файлов
+        </h2>
+        <UploadForm onUploaded={(m) => m?.url && setUploads((prev) => [...prev, m])} />
+
+        {/* Список загруженных файлов */}
         {uploads.length > 0 && (
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {uploads.map((u, i) => (
-              <img
-                key={i}
-                src={`http://localhost:4000${u.thumb || u.url}`}
-                className="rounded shadow-lg"
-              />
-            ))}
+            {uploads
+              .filter((u): u is UploadFile => u && u.url)
+              .map((u, i) => (
+                <div key={i} className="bg-gray-800 p-2 rounded-lg text-center">
+                  {u.thumb || u.url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                    <img
+                      src={`http://localhost:4000${u.thumb || u.url}`}
+                      className="rounded shadow-lg mx-auto"
+                    />
+                  ) : (
+                    <a
+                      href={`http://localhost:4000${u.url}`}
+                      target="_blank"
+                      className="text-purple-400 underline"
+                    >
+                      {u.name || "Скачать файл"}
+                    </a>
+                  )}
+                </div>
+              ))}
           </div>
         )}
       </div>

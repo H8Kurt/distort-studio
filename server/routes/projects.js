@@ -1,47 +1,74 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const Project = require('../models/Project');
+const Project = require("../models/Project");
+const auth = require("../middleware/auth");
 
-// Получить все проекты
-router.get('/', async (req, res) => {
-  const projects = await Project.findAll();
-  res.json(projects);
+// === Получить все проекты ===
+router.get("/", async (req, res) => {
+  try {
+    const projects = await Project.findAll();
+    res.json(projects);
+  } catch (err) {
+    console.error("Ошибка получения проектов:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
 });
 
-// Добавить проект
-router.post('/', async (req, res) => {
+// === Создать проект (авторизованный пользователь) ===
+router.post("/", auth, async (req, res) => {
   try {
     const { title, description, UserId } = req.body;
-    const newProject = await Project.create({ title, description, UserId });
-    res.status(201).json(newProject);
+    if (!title) return res.status(400).json({ error: "Введите название проекта" });
+
+    const project = await Project.create({ title, description, UserId });
+    res.json(project);
+
+    // уведомляем всех клиентов
+    const io = req.app.get("io");
+    io.emit("project:created", project);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Ошибка создания проекта:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// === Обновить проект ===
+router.put("/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { title, description } = req.body;
+
+    const project = await Project.findByPk(id);
+    if (!project) return res.status(404).json({ error: "Проект не найден" });
+
+    project.title = title;
+    project.description = description;
+    await project.save();
+
+    const io = req.app.get("io");
+    io.emit("project:updated", project);
+
+    res.json(project);
+  } catch (err) {
+    console.error("Ошибка обновления проекта:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// === Удалить проект ===
+router.delete("/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    await Project.destroy({ where: { id } });
+
+    const io = req.app.get("io");
+    io.emit("project:deleted", { id });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Ошибка удаления проекта:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 
 module.exports = router;
-router.delete('/:id', async (req, res) => {
-  try {
-    const deleted = await Project.destroy({ where: { id: req.params.id } });
-    res.json({ deleted });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-// Обновить проект
-router.put('/:id', async (req, res) => {
-  try {
-    const { title, description } = req.body;
-    const updated = await Project.update(
-      { title, description },
-      { where: { id: req.params.id } }
-    );
-    res.json({ updated });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-router.get('/:id', async (req,res)=>{
-  const project = await Project.findByPk(req.params.id, { include: [{ model: require('../models/Media') }]});
-  res.json(project);
-});
