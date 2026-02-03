@@ -40,8 +40,11 @@ function App() {
   // Данные
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [uploads, setUploads] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Текущее состояние проекта и его медиа
+  const [projectId, setProjectId] = useState<number | null>(null);
+  const [media, setMedia] = useState<UploadFile[]>([]);
 
   // Новые данные для форм
   const [newUser, setNewUser] = useState({ username: "", email: "" });
@@ -83,6 +86,26 @@ function App() {
     const data = await res.json();
     setUsers(data);
   };
+  const fetchProjectMedia = async (id: number) => {
+  try {
+    const res = await fetch(
+      `http://localhost:4000/api/projects/${id}/media`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!res.ok) throw new Error("Ошибка загрузки медиа");
+
+    const data = await res.json();
+    setMedia(data);
+  } catch (err) {
+    console.error(err);
+    setMedia([]);
+  }
+};
 
   const fetchProjects = async () => {
     const res = await fetch("http://localhost:4000/api/projects");
@@ -90,40 +113,31 @@ function App() {
     setProjects(data);
   };
 
-  const fetchUploads = async () => {
-    try {
-      const res = await fetch("http://localhost:4000/api/upload/list", {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (!res.ok) throw new Error("Не удалось получить список файлов");
-      const data = await res.json();
-      setUploads(data);
-    } catch (err) {
-      console.error("Ошибка при загрузке списка файлов:", err);
-    }
+  
+
+  // === Подписка на медиа выбранного проекта ===
+ // Подгрузка медиа выбранного проекта
+useEffect(() => {
+  if (!projectId) return;
+
+  // Соединяемся с сокетом
+  socket.emit("join-project", projectId);
+
+  // Загружаем существующие медиа
+  fetchProjectMedia(projectId);
+
+  const handleMediaAdded = (newMedia: UploadFile) => {
+    setMedia((prev) => [newMedia, ...prev]);
   };
 
-  // === При загрузке приложения ===
-  useEffect(() => {
-    if (token) checkToken(token);
-    Promise.all([fetchUsers(), fetchProjects(), fetchUploads()]).then(() =>
-      setLoading(false)
-    );
+  socket.on("media:added", handleMediaAdded);
 
-    // Реалтайм события
-    socket.on("project:created", (project) => {
-      setProjects((prev) => [...prev, project]);
-    });
+  return () => {
+    socket.off("media:added", handleMediaAdded);
+  };
+}, [projectId]);
 
-    socket.on("media:uploaded", (file) => {
-      if (file && file.url) setUploads((prev) => [...prev, file]);
-    });
-
-    return () => {
-      socket.off("project:created");
-      socket.off("media:uploaded");
-    };
-  }, [token]);
+  // === Загрузка начальных данных ===
 
   // === Добавление пользователя ===
   const addUser = async (e: React.FormEvent) => {
@@ -140,6 +154,21 @@ function App() {
     setNewUser({ username: "", email: "" });
     fetchUsers();
   };
+useEffect(() => {
+  if (token) checkToken(token);
+
+  Promise.all([fetchUsers(), fetchProjects()]).then(() =>
+    setLoading(false)
+  );
+
+  socket.on("project:created", (project) => {
+    setProjects((prev) => [...prev, project]);
+  });
+
+  return () => {
+    socket.off("project:created");
+  };
+}, [token]);
 
   // === Добавление проекта ===
   const addProject = async (e: React.FormEvent) => {
@@ -161,18 +190,41 @@ function App() {
     fetchProjects();
   };
 
+ const uploadToProject = async (file: File) => {
+  if (!projectId) return alert("Проект не выбран");
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await fetch(
+    `http://localhost:4000/api/projects/${projectId}/media`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: fd,
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+
+  const media = await res.json();
+  setMedia((prev) => [media, ...prev]);
+};
+
+
   // === Удаление / редактирование ===
   const deleteUser = async (id: number) => {
-    await fetch(`http://localhost:4000/api/users/${id}`, {
-      method: "DELETE",
-    });
+    await fetch(`http://localhost:4000/api/users/${id}`, { method: "DELETE" });
     fetchUsers();
   };
 
   const deleteProject = async (id: number) => {
-    await fetch(`http://localhost:4000/api/projects/${id}`, {
-      method: "DELETE",
-    });
+    await fetch(`http://localhost:4000/api/projects/${id}`, { method: "DELETE" });
     fetchProjects();
   };
 
@@ -230,7 +282,7 @@ function App() {
     );
   }
 
-  // === Если вошёл ===
+  // === Основной интерфейс ===
   return (
     <div className="min-h-screen bg-gray-950 text-white p-8">
       {/* === Верхняя панель === */}
@@ -253,7 +305,9 @@ function App() {
           className="bg-gray-800 p-2 rounded text-white flex-1"
           placeholder="Имя пользователя"
           value={newUser.username}
-          onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+          onChange={(e) =>
+            setNewUser({ ...newUser, username: e.target.value })
+          }
         />
         <input
           className="bg-gray-800 p-2 rounded text-white flex-1"
@@ -307,11 +361,14 @@ function App() {
         </button>
       </form>
 
-      <ul className="space-y-2">
+      <ul className="space-y-2 mb-10">
         {projects.map((p) => (
           <li
             key={p.id}
-            className="bg-gray-800 p-3 rounded-lg flex justify-between items-center"
+            className={`bg-gray-800 p-3 rounded-lg flex justify-between items-center cursor-pointer ${
+              projectId === p.id ? "border-2 border-purple-400" : ""
+            }`}
+            onClick={() => setProjectId(p.id)}
           >
             <div>
               <b className="text-lg text-purple-400">{p.title}</b>
@@ -322,56 +379,57 @@ function App() {
             <div className="flex space-x-2">
               <PencilIcon
                 className="w-5 h-5 text-yellow-400 cursor-pointer hover:scale-110"
-                onClick={() =>
+                onClick={(e) => {
+                  e.stopPropagation();
                   editProject(
                     p.id,
                     prompt("Новое имя", p.title) || p.title,
                     prompt("Описание", p.description) || p.description
-                  )
-                }
+                  );
+                }}
               />
               <TrashIcon
                 className="w-5 h-5 text-red-500 cursor-pointer hover:scale-110"
-                onClick={() => deleteProject(p.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteProject(p.id);
+                }}
               />
             </div>
           </li>
         ))}
       </ul>
 
-      {/* === Загрузка файлов === */}
-      <div className="mt-10">
-        <h2 className="text-2xl font-semibold mb-4 text-white">
-          Загрузка файлов
-        </h2>
-        <UploadForm onUploaded={(m) => m?.url && setUploads((prev) => [...prev, m])} />
-
-        {/* Список загруженных файлов */}
-        {uploads.length > 0 && (
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {uploads
-              .filter((u): u is UploadFile => u && u.url)
-              .map((u, i) => (
-                <div key={i} className="bg-gray-800 p-2 rounded-lg text-center">
-                  {u.thumb || u.url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                    <img
-                      src={`http://localhost:4000${u.thumb || u.url}`}
-                      className="rounded shadow-lg mx-auto"
-                    />
-                  ) : (
-                    <a
-                      href={`http://localhost:4000${u.url}`}
-                      target="_blank"
-                      className="text-purple-400 underline"
-                    >
-                      {u.name || "Скачать файл"}
-                    </a>
-                  )}
-                </div>
-              ))}
-          </div>
-        )}
-      </div>
+     {/* === Медиа выбранного проекта === */}
+{projectId && (
+  <div className="mt-10">
+    <h2 className="text-2xl font-semibold mb-4 text-white">
+      Медиа проекта
+    </h2>
+    <UploadForm projectId={projectId} onUploaded={uploadToProject} />
+ <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+  {media.map((u, i) => (
+    <div key={i} className="bg-gray-800 p-2 rounded-lg text-center">
+      {u.type === "image" ? (
+        <img
+          src={`http://localhost:4000${u.thumbUrl || u.url}`} // берём thumb если есть
+          alt={u.originalName || "файл"}
+          className="rounded shadow-lg mx-auto w-32 h-32 object-cover"
+        />
+      ) : (
+        <a
+          href={`http://localhost:4000${u.url}`}
+          target="_blank"
+          className="text-purple-400 underline"
+        >
+          {u.originalName || "Скачать файл"}
+        </a>
+      )}
+    </div>
+  ))}
+</div>
+  </div>
+)}
     </div>
   );
 }

@@ -29,6 +29,7 @@ app.use("/api/upload", uploadRoutes);
 
 // === отдаём файлы из папки uploads ===
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+require("./models/associations");
 
 // === синхронизация БД ===
 sequelize
@@ -45,7 +46,7 @@ app.get("/api/ping", (req, res) => {
 app.get("/api/uploads", async (req, res) => {
   try {
     const files = await Upload.findAll();
-    const response = files.map(f => ({
+    const response = files.map((f) => ({
       id: f.id,
       url: `/uploads/${f.filename}`,
       thumb: f.thumb ? `/uploads/${f.thumb}` : null,
@@ -67,16 +68,23 @@ const io = new Server(server, {
   },
 });
 
+// сохраняем io в app, чтобы использовать в роутерах
+app.set("io", io);
+
+// === Socket.IO ===
 io.on("connection", (socket) => {
   console.log("🟢 Пользователь подключился:", socket.id);
+
+  // пользователь присоединился к конкретному проекту
+  socket.on("join-project", (projectId) => {
+    console.log(`Пользователь ${socket.id} присоединился к проекту ${projectId}`);
+    socket.join(`project_${projectId}`);
+  });
 
   socket.on("disconnect", () => {
     console.log("🔴 Пользователь отключился:", socket.id);
   });
 });
-
-// сохраняем io, чтобы использовать его в uploadRoutes
-app.set("io", io);
 
 // === запуск сервера ===
 server.listen(4000, () => console.log("🚀 Server started on port 4000"));

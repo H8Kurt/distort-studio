@@ -1,22 +1,27 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../db');
-const User = require('./User'); // опционально
-const Project = require('./Project'); // опционально
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const Media = sequelize.define('Media', {
-  filename: { type: DataTypes.STRING, allowNull: false },
-  originalName: { type: DataTypes.STRING },
-  mime: { type: DataTypes.STRING },
-  size: { type: DataTypes.INTEGER },
-  url: { type: DataTypes.STRING },   // путь /uploads/...
-  thumbUrl: { type: DataTypes.STRING }, // для изображений
-  type: { type: DataTypes.STRING },  // image | audio | other
+const Media = sequelize.define("Media", {
+  filename: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  originalName: DataTypes.STRING,
+  mime: DataTypes.STRING,
+  size: DataTypes.INTEGER,
+
+  url: DataTypes.STRING,
+  thumbUrl: DataTypes.STRING,
+
+  type: {
+    type: DataTypes.STRING, // image | audio
+  },
+
+  // 🔥 ВАЖНО: ЯВНОЕ ПОЛЕ
+  ProjectId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
 });
-
-User.hasMany(Media);
-Media.belongsTo(User);
-
-Project.hasMany(Media);
-Media.belongsTo(Project);
 
 module.exports = Media;

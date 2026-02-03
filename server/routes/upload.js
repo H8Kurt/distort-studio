@@ -6,24 +6,32 @@ const path = require("path");
 const fs = require("fs");
 const auth = require("../middleware/auth");
 
-// === настройка multer ===
+// ============================
+// MULTER STORAGE
+// ============================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dest = file.mimetype.startsWith("image/")
       ? path.join(__dirname, "../uploads/images")
       : path.join(__dirname, "../uploads/audio");
-    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+
+    if (!fs.existsSync(dest)) {
+      fs.mkdirSync(dest, { recursive: true });
+    }
+
     cb(null, dest);
   },
+
   filename: (req, file, cb) => {
-    const safeName = Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
+    const safeName =
+      Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
     cb(null, safeName);
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // до 10 МБ
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     if (
       file.mimetype.startsWith("image/") ||
@@ -36,58 +44,47 @@ const upload = multer({
   },
 });
 
-// === Загрузка файла ===
+// ============================
+// POST /api/upload/file
+// ❗ ТОЛЬКО ФАЙЛ, БЕЗ БД
+// ============================
 router.post("/file", auth, upload.single("file"), async (req, res) => {
-  const file = req.file;
-  if (!file) return res.status(400).json({ error: "Файл не загружен" });
-
-  const isImage = file.mimetype.startsWith("image/");
-  const baseUrl = "/uploads/" + (isImage ? "images" : "audio");
-  const relativePath = `${baseUrl}/${path.basename(file.path)}`;
-
-  const response = { url: relativePath };
-
-  // создаём миниатюру, если изображение
-  if (isImage) {
-    const thumbPath = path.join(path.dirname(file.path), "thumb-" + path.basename(file.path));
-    await sharp(file.path).resize(300).toFile(thumbPath);
-    response.thumb = `${baseUrl}/${path.basename(thumbPath)}`;
-  }
-
-  // уведомляем всех клиентов
-  const io = req.app.get("io");
-  io.emit("media:uploaded", response);
-
-  res.json(response);
-});
-
-// === Получение списка всех файлов ===
-router.get("/list", auth, async (req, res) => {
   try {
-    const folders = [
-      { path: path.join(__dirname, "../uploads/images"), baseUrl: "/uploads/images" },
-      { path: path.join(__dirname, "../uploads/audio"), baseUrl: "/uploads/audio" },
-    ];
-
-    const files = [];
-
-    for (const folder of folders) {
-      if (!fs.existsSync(folder.path)) continue;
-      const items = fs.readdirSync(folder.path);
-      for (const item of items) {
-        if (item.startsWith("thumb-")) continue; // миниатюры будут в поле thumb
-        const filePath = `${folder.baseUrl}/${item}`;
-        const thumbPath = fs.existsSync(path.join(folder.path, "thumb-" + item))
-          ? `${folder.baseUrl}/thumb-${item}`
-          : null;
-        files.push({ url: filePath, thumb: thumbPath });
-      }
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: "Файл не загружен" });
     }
 
-    res.json(files);
+    const isImage = file.mimetype.startsWith("image/");
+    const baseUrl = "/uploads/" + (isImage ? "images" : "audio");
+    const url = `${baseUrl}/${file.filename}`;
+
+    let thumbUrl = null;
+
+    if (isImage) {
+      const thumbName = "thumb-" + file.filename;
+      const thumbPath = path.join(file.destination, thumbName);
+
+      await sharp(file.path)
+        .resize(300)
+        .toFile(thumbPath);
+
+      thumbUrl = `${baseUrl}/${thumbName}`;
+    }
+
+    // ❗ НИКАКОЙ Media.create()
+    // ❗ ProjectId здесь не нужен
+
+    res.json({
+      filename: file.filename,
+      originalName: file.originalname,
+      url,
+      thumbUrl,
+      type: isImage ? "image" : "audio",
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Ошибка получения списка файлов" });
+    res.status(500).json({ error: "Ошибка загрузки файла" });
   }
 });
 
