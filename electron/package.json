@@ -1,0 +1,16 @@
+{
+  "name": "electron",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^40.1.0"
+  }
+  
+}
