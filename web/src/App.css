@@ -1,42 +1,45 @@
+/* === Корневой контейнер === */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  /* УБРАНО: text-align: center; — ломал флекс-лейауты */
+  /* УБРАНО: padding: 2rem; — дублируется в компонентах через Tailwind */
 }
 
+/* === Логотип (если используется) === */
 .logo {
-  height: 6em;
-  padding: 1.5em;
+  height: 3em;
+  padding: 0.5em;
   will-change: filter;
   transition: filter 300ms;
 }
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  filter: drop-shadow(0 0 1em #a78bfaaa);
 }
 
 @keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  .logo.animate {
+    animation: logo-spin 20s linear infinite;
   }
 }
 
+/* === Карточки (базовые, если нужны вне Tailwind) === */
 .card {
-  padding: 2em;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: rgba(31, 41, 55, 0.5);
+  border: 1px solid rgba(75, 85, 99, 0.3);
 }
 
+/* === Утилиты === */
 .read-the-docs {
-  color: #888;
+  color: #6b7280;
+  font-size: 0.875rem;
 }
