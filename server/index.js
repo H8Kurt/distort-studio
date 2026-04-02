@@ -9,6 +9,10 @@ const sequelize = require("./db"); // подключение к БД
 const User = require("./models/User");
 const Project = require("./models/Project");
 const Upload = require("./models/Upload"); // модель для файлов
+const Session = require("./models/Session");
+const Version = require("./models/Version");
+const Branch = require("./models/Branch");
+const Collab = require("./models/Collab");
 
 const app = express();
 
@@ -21,11 +25,15 @@ const userRoutes = require("./routes/users");
 const projectRoutes = require("./routes/projects");
 const authRoutes = require("./routes/auth");
 const uploadRoutes = require("./routes/upload");
+const sessionRoutes = require("./routes/sessions");
+const versionRoutes = require("./routes/versions");
 
 app.use("/api/users", userRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/sessions", sessionRoutes);
+app.use("/api/projects", versionRoutes);
 
 // === отдаём файлы из папки uploads ===
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
