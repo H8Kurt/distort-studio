@@ -23,9 +23,11 @@ interface Project {
 }
 
 interface UploadFile {
-  name?: string;
+  filename?: string;
+  originalName?: string;
+  thumbUrl?: string;
+  type: string;
   url: string;
-  thumb?: string;
 }
 
 // === Компонент ===
@@ -190,38 +192,6 @@ useEffect(() => {
     fetchProjects();
   };
 
- const uploadToProject = async (file: File) => {
-  if (!projectId) return alert("Проект не выбран");
-
-  const fd = new FormData();
-  fd.append("file", file);
-
-  const res = await fetch(
-    `http://localhost:4000/api/projects/${projectId}/media`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: fd,
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
-  }
-
-  const media = await res.json();
-  setMedia((prev) => [media, ...prev]);
-};
-
-
-  // === Удаление / редактирование ===
-  const deleteUser = async (id: number) => {
-    await fetch(`http://localhost:4000/api/users/${id}`, { method: "DELETE" });
-    fetchUsers();
-  };
 
   const deleteProject = async (id: number) => {
     await fetch(`http://localhost:4000/api/projects/${id}`, { method: "DELETE" });
@@ -331,7 +301,7 @@ useEffect(() => {
             </span>
             <TrashIcon
               className="w-5 h-5 text-red-500 cursor-pointer hover:scale-110"
-              onClick={() => deleteUser(u.id)}
+              onClick={(e) => { e.stopPropagation(); }}
             />
           </li>
         ))}
@@ -406,7 +376,7 @@ useEffect(() => {
     <h2 className="text-2xl font-semibold mb-4 text-white">
       Медиа проекта
     </h2>
-    <UploadForm projectId={projectId} onUploaded={uploadToProject} />
+    <UploadForm projectId={projectId} onUploaded={(media) => { setMedia((prev) => [media, ...prev]); }} />
  <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
   {media.map((u, i) => (
     <div key={i} className="bg-gray-800 p-2 rounded-lg text-center">
