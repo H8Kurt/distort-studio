@@ -10,11 +10,17 @@ import {
   SparklesIcon,
   PhotoIcon,
   DocumentTextIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  UserIcon,
+  ArrowPathIcon,
+  ChatBubbleLeftIcon
 } from "@heroicons/react/24/solid";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import UploadForm from "./UploadForm";
+import ProfileEditForm from "./ProfileEditForm";
+import CollaborationPanel from "./CollaborationPanel";
+import VersionsPanel from "./VersionsPanel";
 import { io } from "socket.io-client";
 import "./styles/globals.css";
 
@@ -26,6 +32,10 @@ interface User {
   username: string;
   email: string;
   role: string;
+  bio?: string;
+  avatarUrl?: string;
+  rebelRank?: number;
+  createdAt?: string;
 }
 
 interface Project {
@@ -41,6 +51,25 @@ interface UploadFile {
   thumbUrl?: string;
   type: string;
   url: string;
+}
+
+interface Version {
+  id: number;
+  versionNumber: string;
+  message: string;
+  createdAt: string;
+  author: {
+    id: number;
+    username: string;
+  };
+  isCurrent?: boolean;
+}
+
+interface Collaborator {
+  id: number;
+  username: string;
+  email: string;
+  role: "owner" | "editor" | "viewer";
 }
 
 // === Компонент аватара ===
@@ -175,6 +204,14 @@ function App() {
   const [newProject, setNewProject] = useState({ title: "", description: "" });
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
 
+  // Навигация (вкладки)
+  const [activeTab, setActiveTab] = useState<"media" | "versions" | "collabs" | "profile">("media");
+
+  // Версии и коллаборации
+  const [versions, setVersions] = useState<Version[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+
   // === Проверка токена ===
   const checkToken = async (t: string | null) => {
     if (!t) return;
@@ -236,12 +273,50 @@ function App() {
     setProjects(data);
   };
 
+  // === Загрузка версий проекта ===
+  const fetchProjectVersions = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/projects/${id}/versions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVersions(data);
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки версий:", err);
+      setVersions([]);
+    }
+  };
+
+  // === Загрузка коллабораторов проекта ===
+  const fetchProjectCollaborators = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/projects/${id}/collaborators`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCollaborators(data);
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки коллабораторов:", err);
+      setCollaborators([]);
+    }
+  };
+
   // === Подписка на медиа выбранного проекта ===
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId) {
+      setVersions([]);
+      setCollaborators([]);
+      return;
+    }
 
     socket.emit("join-project", projectId);
     fetchProjectMedia(projectId);
+    fetchProjectVersions(projectId);
+    fetchProjectCollaborators(projectId);
 
     const handleMediaAdded = (newMedia: UploadFile) => {
       setMedia((prev) => [newMedia, ...prev]);
@@ -328,6 +403,92 @@ function App() {
       body: JSON.stringify({ title: newTitle, description: newDescription }),
     });
     fetchProjects();
+  };
+
+  // === Обновление профиля ===
+  const updateProfile = async (data: Partial<User>) => {
+    const res = await fetch(`http://localhost:4000/api/users/${currentUser?.id}`, {
+      method: "PUT",
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error("Failed to update profile");
+    const updated = await res.json();
+    setCurrentUser(updated);
+    setIsEditingProfile(false);
+  };
+
+  // === Создание версии ===
+  const createVersion = async (message: string) => {
+    const res = await fetch(`http://localhost:4000/api/projects/${projectId}/versions`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ message }),
+    });
+    if (!res.ok) throw new Error("Failed to create version");
+    await fetchProjectVersions(projectId!);
+  };
+
+  // === Восстановление версии ===
+  const restoreVersion = async (versionId: number) => {
+    if (!confirm("Восстановить эту версию? Текущие изменения будут сохранены как новая версия.")) return;
+    const res = await fetch(`http://localhost:4000/api/projects/${projectId}/versions/${versionId}/restore`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Failed to restore version");
+    await fetchProjectVersions(projectId!);
+    await fetchProjectMedia(projectId!);
+  };
+
+  // === Сравнение версий ===
+  const compareVersions = (v1: number, v2: number) => {
+    alert(`Сравнение версий ${v1} и ${v2}\n(Функционал в разработке)`);
+  };
+
+  // === Приглашение в проект ===
+  const inviteCollaborator = async (email: string, role: "editor" | "viewer") => {
+    const res = await fetch(`http://localhost:4000/api/projects/${projectId}/invite`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ email, role }),
+    });
+    if (!res.ok) throw new Error("Failed to invite");
+    await fetchProjectCollaborators(projectId!);
+  };
+
+  // === Удаление коллаборатора ===
+  const removeCollaborator = async (userId: number) => {
+    if (!confirm("Удалить участника из проекта?")) return;
+    const res = await fetch(`http://localhost:4000/api/projects/${projectId}/collaborators/${userId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Failed to remove");
+    await fetchProjectCollaborators(projectId!);
+  };
+
+  // === Изменение роли ===
+  const changeRole = async (userId: number, role: "editor" | "viewer") => {
+    const res = await fetch(`http://localhost:4000/api/projects/${projectId}/collaborators/${userId}/role`, {
+      method: "PUT",
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) throw new Error("Failed to change role");
+    await fetchProjectCollaborators(projectId!);
   };
 
   // === Загрузка ===
@@ -498,42 +659,181 @@ function App() {
             </div>
           </div>
 
-          {/* === Правая колонка - Медиа === */}
+          {/* === Правая колонка - Контент проекта === */}
           <div className="lg:col-span-8 xl:col-span-9">
             {projectId ? (
               <div className="animate-fade-in">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                    <PhotoIcon className="w-6 h-6 text-purple-400" />
-                    Медиа проекта
-                  </h2>
-                  <div className="flex items-center gap-2 text-sm text-gray-400">
-                    <ClockIcon className="w-4 h-4" />
-                    {media.length} файлов
-                  </div>
-                </div>
-                
+                {/* Заголовок проекта с вкладками */}
                 <div className="card mb-6">
-                  <UploadForm 
-                    projectId={projectId} 
-                    onUploaded={(mediaItem) => { 
-                      setMedia((prev) => [mediaItem, ...prev]); 
-                    }} 
-                  />
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h2 className="text-2xl font-bold text-white mb-1">
+                        {projects.find(p => p.id === projectId)?.title || "Проект"}
+                      </h2>
+                      <p className="text-gray-400 text-sm">
+                        {projects.find(p => p.id === projectId)?.description || "Нет описания"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("media")}
+                      className="btn btn-secondary btn-icon"
+                      title="Назад к медиа"
+                    >
+                      <ArrowLeftOnRectangleIcon className="w-5 h-5 rotate-180" />
+                    </button>
+                  </div>
+
+                  {/* Вкладки навигации */}
+                  <div className="flex gap-2 border-t border-gray-700/50 pt-4">
+                    <button
+                      onClick={() => setActiveTab("media")}
+                      className={`btn flex-1 ${activeTab === "media" ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      <PhotoIcon className="w-4 h-4" />
+                      Медиа
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("versions")}
+                      className={`btn flex-1 ${activeTab === "versions" ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      <GitBranchIcon className="w-4 h-4" />
+                      Версии
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("collabs")}
+                      className={`btn flex-1 ${activeTab === "collabs" ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      <UserGroupIcon className="w-4 h-4" />
+                      Коллабы
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("profile")}
+                      className={`btn flex-1 ${activeTab === "profile" ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      <UserIcon className="w-4 h-4" />
+                      Профиль
+                    </button>
+                  </div>
                 </div>
-                
-                {media.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {media.map((u, i) => (
-                      <MediaCard key={i} media={u} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-16 card">
-                    <PhotoIcon className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                    <p className="text-gray-400 text-lg mb-2">Нет медиафайлов</p>
-                    <p className="text-gray-500 text-sm">Загрузите первые файлы в этот проект</p>
-                  </div>
+
+                {/* Контент вкладок */}
+                {activeTab === "media" && (
+                  <>
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                        <PhotoIcon className="w-6 h-6 text-purple-400" />
+                        Медиа проекта
+                      </h3>
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <ClockIcon className="w-4 h-4" />
+                        {media.length} файлов
+                      </div>
+                    </div>
+                    
+                    <div className="card mb-6">
+                      <UploadForm 
+                        projectId={projectId} 
+                        onUploaded={(mediaItem) => { 
+                          setMedia((prev) => [mediaItem, ...prev]); 
+                        }} 
+                      />
+                    </div>
+                    
+                    {media.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {media.map((u, i) => (
+                          <MediaCard key={i} media={u} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-16 card">
+                        <PhotoIcon className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                        <p className="text-gray-400 text-lg mb-2">Нет медиафайлов</p>
+                        <p className="text-gray-500 text-sm">Загрузите первые файлы в этот проект</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {activeTab === "versions" && (
+                  <VersionsPanel
+                    projectId={projectId}
+                    versions={versions}
+                    onCreateVersion={createVersion}
+                    onRestoreVersion={restoreVersion}
+                    onCompareVersions={compareVersions}
+                  />
+                )}
+
+                {activeTab === "collabs" && currentUser && (
+                  <CollaborationPanel
+                    projectId={projectId}
+                    currentUserId={currentUser.id}
+                    collaborators={collaborators}
+                    onInvite={inviteCollaborator}
+                    onRemove={removeCollaborator}
+                    onRoleChange={changeRole}
+                  />
+                )}
+
+                {activeTab === "profile" && currentUser && (
+                  isEditingProfile ? (
+                    <ProfileEditForm
+                      user={currentUser}
+                      onSave={updateProfile}
+                      onCancel={() => setIsEditingProfile(false)}
+                    />
+                  ) : (
+                    <div className="card">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                          <UserIcon className="w-6 h-6 text-purple-400" />
+                          Ваш профиль
+                        </h3>
+                        <button
+                          onClick={() => setIsEditingProfile(true)}
+                          className="btn btn-primary"
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                          Редактировать
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-6 mb-6">
+                        <Avatar username={currentUser.username} size="lg" />
+                        <div>
+                          <h4 className="text-2xl font-bold text-white">{currentUser.username}</h4>
+                          <p className="text-gray-400">{currentUser.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-gray-800/50 rounded-lg p-4">
+                          <div className="flex items-center gap-2 text-purple-400 mb-2">
+                            <SparklesIcon className="w-5 h-5" />
+                            <span className="text-sm font-medium">Rebel Rank</span>
+                          </div>
+                          <p className="text-3xl font-bold text-white">{currentUser.rebelRank || 1}</p>
+                        </div>
+                        <div className="bg-gray-800/50 rounded-lg p-4">
+                          <div className="flex items-center gap-2 text-blue-400 mb-2">
+                            <ClockIcon className="w-5 h-5" />
+                            <span className="text-sm font-medium">В проекте</span>
+                          </div>
+                          <p className="text-lg text-white">
+                            {currentUser.createdAt ? new Date(currentUser.createdAt).toLocaleDateString('ru-RU') : '—'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {currentUser.bio && (
+                        <div className="mt-6 pt-6 border-t border-gray-700/50">
+                          <h5 className="text-sm font-medium text-gray-300 mb-2">О себе</h5>
+                          <p className="text-gray-400">{currentUser.bio}</p>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
             ) : (
@@ -545,53 +845,6 @@ function App() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* === Разделитель === */}
-        <div className="divider my-8" />
-
-        {/* === Секция пользователей === */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-4">
-            <UserGroupIcon className="w-6 h-6 text-purple-400" />
-            Пользователи
-          </h2>
-          
-          <form onSubmit={addUser} className="card mb-4">
-            <div className="flex gap-3">
-              <input
-                className="input flex-1"
-                placeholder="Имя пользователя"
-                value={newUser.username}
-                onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-              />
-              <input
-                className="input flex-1"
-                placeholder="Email"
-                value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-              />
-              <button type="submit" className="btn btn-primary">
-                <PlusIcon className="w-4 h-4" />
-                Добавить
-              </button>
-            </div>
-          </form>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {users.map((u) => (
-              <div
-                key={u.id}
-                className="card flex items-center gap-3 group hover:border-purple-500/30 transition-all"
-              >
-                <Avatar username={u.username} size="md" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-white truncate">{u.username}</p>
-                  <p className="text-sm text-gray-400 truncate">{u.email}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </main>
