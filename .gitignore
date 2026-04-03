@@ -1,6 +1,13 @@
 ```
+# Compiled and build artifacts
+*.css.map
+
 # Dependencies
 node_modules/
+
+# Editors
+.vscode/
+.idea/
 
 # Environment
 .env
@@ -10,22 +17,14 @@ node_modules/
 # Logs
 *.log
 
+# Temp files
+*.tmp
+*.swp
+
 # Coverage
 coverage/
 htmlcov/
 .coverage
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Build outputs
-dist/
-build/
-target/
 
 # Python
 __pycache__/
@@ -33,41 +32,25 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.nox/
-.pytest_cache/
-.mypy_cache/
+*.so
+*.egg-info/
+.eggs/
 
-# Node.js
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-node_modules/
+# Build directories
 dist/
 build/
-.nyc_output/
-coverage/
-*.log
+*.min.js
+*.min.css
 
-# Compiled and binary files
-*.exe
-*.dll
-*.so
-*.a
-*.o
-*.obj
-*.out
-*.class
-
-# System files
+# OS generated files
 .DS_Store
 Thumbs.db
+
+# Testing
+.mypy_cache/
+.pytest_cache/
+.nyc_output/
+coverage/
 
 # Compressed files
 *.zip
@@ -88,4 +71,8 @@ Thumbs.db
 *.Z
 *.lz
 *.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```
