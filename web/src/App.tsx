@@ -436,19 +436,7 @@ function ProjectsPage({
 }
 
 // === Страница версий ===
-function VersionsPage({ token, projects, projectId, setProjectId }: { token: string | null; projects: Project[]; projectId: number | null; setProjectId: any; }) { 
-  token, 
-  currentUser, 
-  projects, 
-  projectId,
-  setProjectId 
-}: { 
-  token: string | null; 
-  currentUser: User | null; 
-  projects: Project[]; 
-  projectId: number | null;
-  setProjectId: any;
-}) {
+function VersionsPage({ token, currentUser, projects, projectId, setProjectId }: { token: string | null; currentUser: User | null; projects: Project[]; projectId: number | null; setProjectId: any; }) {
   const [versions, setVersions] = useState<Version[]>([]);
 
   const fetchProjectVersions = async (id: number) => {
