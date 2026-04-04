@@ -1,26 +1,148 @@
 @import "tailwindcss";
 
-/* === Глобальные переменные === */
+/* ============================
+   === СИСТЕМА ТЕМ
+   ============================ */
+
+/* Тема по умолчанию - Cyber Dark */
 :root {
+  --theme-name: 'cyber-dark';
+  
+  /* Основные цвета фона */
   --bg-primary: #0a0a0f;
   --bg-secondary: #12121a;
   --bg-card: #1a1a25;
   --bg-hover: #252535;
   
+  /* Акцентные цвета */
   --accent-primary: #8b5cf6;
   --accent-secondary: #a78bfa;
   --accent-glow: rgba(139, 92, 246, 0.3);
+  --accent-gradient: linear-gradient(135deg, #8b5cf6, #7c3aed);
   
+  /* Текст */
   --text-primary: #ffffff;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
   
+  /* Статусы */
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
   
+  /* Границы */
   --border-color: #27273a;
   --border-glow: rgba(139, 92, 246, 0.2);
+}
+
+/* Светлая тема - Clean Light */
+[data-theme='light'] {
+  --theme-name: 'clean-light';
+  
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f5f9;
+  
+  --accent-primary: #6366f1;
+  --accent-secondary: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.2);
+  --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  
+  --border-color: #e2e8f0;
+  --border-glow: rgba(99, 102, 241, 0.15);
+}
+
+/* Тёмная тема - Midnight Blue */
+[data-theme='midnight'] {
+  --theme-name: 'midnight-blue';
+  
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-card: #1e293b;
+  --bg-hover: #334155;
+  
+  --accent-primary: #3b82f6;
+  --accent-secondary: #60a5fa;
+  --accent-glow: rgba(59, 130, 246, 0.3);
+  --accent-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+  
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  
+  --border-color: #334155;
+  --border-glow: rgba(59, 130, 246, 0.2);
+}
+
+/* Тёплая тема - Sunset Orange */
+[data-theme='sunset'] {
+  --theme-name: 'sunset-orange';
+  
+  --bg-primary: #1a1a1f;
+  --bg-secondary: #25252e;
+  --bg-card: #2a2a35;
+  --bg-hover: #353540;
+  
+  --accent-primary: #f97316;
+  --accent-secondary: #fb923c;
+  --accent-glow: rgba(249, 115, 22, 0.3);
+  --accent-gradient: linear-gradient(135deg, #f97316, #ea580c);
+  
+  --text-primary: #fef3c7;
+  --text-secondary: #fde68a;
+  --text-muted: #d97706;
+  
+  --border-color: #404050;
+  --border-glow: rgba(249, 115, 22, 0.2);
+}
+
+/* Природная тема - Forest Green */
+[data-theme='forest'] {
+  --theme-name: 'forest-green';
+  
+  --bg-primary: #0c1a12;
+  --bg-secondary: #14291f;
+  --bg-card: #1a3326;
+  --bg-hover: #204030;
+  
+  --accent-primary: #10b981;
+  --accent-secondary: #34d399;
+  --accent-glow: rgba(16, 185, 129, 0.3);
+  --accent-gradient: linear-gradient(135deg, #10b981, #059669);
+  
+  --text-primary: #ecfdf5;
+  --text-secondary: #a7f3d0;
+  --text-muted: #6ee7b7;
+  
+  --border-color: #2d5f45;
+  --border-glow: rgba(16, 185, 129, 0.2);
+}
+
+/* Розовая тема - Neon Pink */
+[data-theme='neon'] {
+  --theme-name: 'neon-pink';
+  
+  --bg-primary: #0f0a15;
+  --bg-secondary: #1a0f25;
+  --bg-card: #251535;
+  --bg-hover: #352045;
+  
+  --accent-primary: #ec4899;
+  --accent-secondary: #f472b6;
+  --accent-glow: rgba(236, 72, 153, 0.4);
+  --accent-gradient: linear-gradient(135deg, #ec4899, #db2777);
+  
+  --text-primary: #fce7f3;
+  --text-secondary: #fbcfe8;
+  --text-muted: #f9a8d4;
+  
+  --border-color: #503060;
+  --border-glow: rgba(236, 72, 153, 0.3);
 }
 
 /* === Базовые настройки === */
@@ -92,24 +214,22 @@ a:hover {
 
 /* === Градиентный фон === */
 .gradient-bg {
-  background: 
-    radial-gradient(ellipse at top left, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom right, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+  background: var(--bg-primary);
 }
 
 /* === Glassmorphism эффект === */
 .glass {
-  background: rgba(26, 26, 37, 0.7);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
 }
 
 .glass-strong {
-  background: rgba(26, 26, 37, 0.9);
+  background: var(--bg-card);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color);
 }
 
 /* === Карточки === */
@@ -144,13 +264,13 @@ a:hover {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-primary), #7c3aed);
+  background: var(--accent-gradient);
   color: white;
-  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 15px var(--accent-glow);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 6px 25px rgba(139, 92, 246, 0.5);
+  box-shadow: 0 6px 25px var(--accent-glow), 0 0 30px var(--accent-glow);
   transform: translateY(-1px);
 }
 
@@ -233,7 +353,7 @@ a:hover {
 
 /* === Утилиты === */
 .text-gradient {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  background: var(--accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -251,7 +371,7 @@ a:hover {
   inset: 0;
   border-radius: 12px;
   padding: 1px;
-  background: linear-gradient(135deg, var(--accent-primary), transparent, var(--accent-secondary));
+  background: var(--accent-gradient);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -332,7 +452,7 @@ a:hover {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  background: var(--accent-gradient);
   border-radius: 2px;
   transition: width 0.3s ease;
 }

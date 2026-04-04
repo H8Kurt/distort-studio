@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { 
-  TrashIcon, 
-  PencilIcon, 
-  PlusIcon, 
+import {
+  TrashIcon,
+  PencilIcon,
+  PlusIcon,
   UserGroupIcon,
   ClockIcon,
   FolderIcon,
@@ -12,7 +12,8 @@ import {
   PhotoIcon,
   DocumentTextIcon,
   ChevronRightIcon,
-  UserIcon
+  UserIcon,
+  SwatchIcon
 } from "@heroicons/react/24/solid";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
@@ -20,6 +21,7 @@ import UploadForm from "./UploadForm";
 import ProfileEditForm from "./ProfileEditForm";
 import CollaborationPanel from "./CollaborationPanel";
 import VersionsPanel from "./VersionsPanel";
+import ThemeSwitcher from "./ThemeSwitcher";
 import { io } from "socket.io-client";
 import "./styles/globals.css";
 
@@ -763,7 +765,8 @@ function MainLayout({
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <ThemeSwitcher />
               <Avatar username={currentUser?.username || ""} url={currentUser?.avatarUrl} />
               <button
                 onClick={logout}
@@ -863,7 +866,12 @@ function App() {
     fetchProjectMedia(projectId);
 
     const handleMediaAdded = (newMedia: UploadFile) => {
-      setMedia((prev: UploadFile[]) => [newMedia, ...prev]);
+      // Проверяем, не добавили ли мы уже этот файл (чтобы избежать дубликатов)
+      setMedia((prev: UploadFile[]) => {
+        const exists = prev.some(m => m.filename === newMedia.filename);
+        if (exists) return prev;
+        return [newMedia, ...prev];
+      });
     };
 
     socket.on("media:added", handleMediaAdded);
