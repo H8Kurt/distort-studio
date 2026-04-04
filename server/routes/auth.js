@@ -50,7 +50,9 @@ const auth = require('../middleware/auth'); // путь к твоему middlewa
 // получить инфо о текущем пользователе
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id, { attributes: ['id','username','email','role'] });
+    const user = await User.findByPk(req.user.id, { 
+      attributes: ['id','username','email','role','bio','avatarUrl','rebelRank','createdAt'] 
+    });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (err) {

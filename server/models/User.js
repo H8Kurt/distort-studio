@@ -10,7 +10,10 @@ const User = sequelize.define('User', {
     unique: 'users_email_unique'
   },
   password: { type: DataTypes.STRING, allowNull: false },
-  role: { type: DataTypes.STRING, defaultValue: 'user' } // admin или user
+  role: { type: DataTypes.STRING, defaultValue: 'user' }, // admin или user
+  bio: { type: DataTypes.TEXT, allowNull: true },
+  avatarUrl: { type: DataTypes.STRING, allowNull: true },
+  rebelRank: { type: DataTypes.INTEGER, defaultValue: 1 }
 });
 
 // Хэширование пароля перед сохранением
