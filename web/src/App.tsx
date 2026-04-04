@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import {
   TrashIcon,
@@ -13,7 +13,26 @@ import {
   DocumentTextIcon,
   ChevronRightIcon,
   UserIcon,
-  SwatchIcon
+  SwatchIcon,
+  HomeIcon,
+  CubeIcon,
+  Cog6ToothIcon,
+  BellIcon,
+  SearchIcon,
+  GridIcon,
+  ListBulletIcon,
+  HeartIcon,
+  EyeIcon,
+  ShareIcon,
+  BookmarkIcon,
+  ChatBubbleLeftRightIcon,
+  FireIcon,
+  TrophyIcon,
+  CalendarIcon,
+  LinkIcon,
+  MapPinIcon,
+  CameraIcon,
+  XMarkIcon
 } from "@heroicons/react/24/solid";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
@@ -35,8 +54,11 @@ interface User {
   role: string;
   bio?: string;
   avatarUrl?: string;
+  coverUrl?: string;
   rebelRank?: number;
   createdAt?: string;
+  location?: string;
+  website?: string;
 }
 
 interface Project {
@@ -44,6 +66,11 @@ interface Project {
   title: string;
   description: string;
   UserId: number;
+  coverImage?: string;
+  mediaCount?: number;
+  likesCount?: number;
+  viewsCount?: number;
+  updatedAt?: string;
 }
 
 interface UploadFile {
