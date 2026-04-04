@@ -4,7 +4,11 @@ const bcrypt = require('bcryptjs');
 
 const User = sequelize.define('User', {
   username: { type: DataTypes.STRING, allowNull: false },
-  email: { type: DataTypes.STRING, unique: true, allowNull: false },
+  email: { 
+    type: DataTypes.STRING, 
+    allowNull: false,
+    unique: 'users_email_unique'
+  },
   password: { type: DataTypes.STRING, allowNull: false },
   role: { type: DataTypes.STRING, defaultValue: 'user' } // admin или user
 });
