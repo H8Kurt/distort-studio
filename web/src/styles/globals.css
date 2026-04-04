@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================
-   === СИСТЕМА ТЕМ
+   === СИСТЕМА ТЕМ С РАСШИРЕННЫМИ НАСТРОЙКАМИ
    ============================ */
 
 /* Тема по умолчанию - Cyber Dark */
@@ -215,6 +215,10 @@ a:hover {
 /* === Градиентный фон === */
 .gradient-bg {
   background: var(--bg-primary);
+  background-image: 
+    radial-gradient(at 40% 20%, var(--accent-glow) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
 }
 
 /* === Glassmorphism эффект === */
@@ -233,18 +237,52 @@ a:hover {
 }
 
 /* === Карточки === */
-.card {
+.bg-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card:hover {
-  border-color: var(--accent-primary);
+.bg-bg-secondary {
+  background: var(--bg-secondary);
+}
+
+.bg-bg-hover {
+  background: var(--bg-hover);
+}
+
+.border-border-color {
+  border-color: var(--border-color);
+}
+
+.text-text-primary {
+  color: var(--text-primary);
+}
+
+.text-text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-text-muted {
+  color: var(--text-muted);
+}
+
+.text-accent-primary {
+  color: var(--accent-primary);
+}
+
+.text-accent-secondary {
+  color: var(--accent-secondary);
+}
+
+.text-danger {
+  color: var(--danger);
+}
+
+.ring-accent-primary {
+  --tw-ring-color: var(--accent-primary);
+}
+
+.shadow-accent-glow {
   box-shadow: 0 0 30px var(--accent-glow);
-  transform: translateY(-2px);
 }
 
 /* === Кнопки === */
@@ -472,4 +510,12 @@ a:hover {
 html {
   scrollbar-width: thin;
   scrollbar-color: var(--accent-primary) var(--bg-secondary);
+}
+
+/* === Line clamp utility === */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
