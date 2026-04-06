@@ -164,6 +164,12 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
+  width: 100%;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
 }
 
 /* === Скроллбар === */
@@ -219,6 +225,8 @@ a:hover {
     radial-gradient(at 40% 20%, var(--accent-glow) 0px, transparent 50%),
     radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
     radial-gradient(at 0% 50%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+  min-height: 100vh;
+  width: 100%;
 }
 
 /* === Glassmorphism эффект === */
@@ -299,6 +307,7 @@ a:hover {
   cursor: pointer;
   transition: all 0.2s ease;
   text-transform: none;
+  white-space: nowrap;
 }
 
 .btn-primary {
