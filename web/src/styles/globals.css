@@ -155,6 +155,8 @@
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 body {
@@ -165,11 +167,13 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   width: 100%;
+  max-width: 100vw;
 }
 
 #root {
   width: 100%;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* === Скроллбар === */
@@ -227,6 +231,7 @@ a:hover {
     radial-gradient(at 0% 50%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
   min-height: 100vh;
   width: 100%;
+  overflow-x: hidden;
 }
 
 /* === Glassmorphism эффект === */
@@ -245,6 +250,19 @@ a:hover {
 }
 
 /* === Карточки === */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 30px var(--accent-glow);
+}
+
 .bg-card {
   background: var(--bg-card);
 }
@@ -302,7 +320,7 @@ a:hover {
   padding: 0.625rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -345,7 +363,7 @@ a:hover {
 
 .btn-icon {
   padding: 0.5rem;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 /* === Поля ввода === */
@@ -354,7 +372,7 @@ a:hover {
   padding: 0.75rem 1rem;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-primary);
   font-size: 0.875rem;
   transition: all 0.2s ease;
@@ -504,6 +522,21 @@ a:hover {
   transition: width 0.3s ease;
 }
 
+/* === Line clamp utility === */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* === Адаптивность === */
 @media (max-width: 768px) {
   html {
@@ -513,6 +546,10 @@ a:hover {
   h1 { font-size: 2rem; }
   h2 { font-size: 1.5rem; }
   h3 { font-size: 1.25rem; }
+  
+  .gradient-bg {
+    background-position: center;
+  }
 }
 
 /* === Темизация скролла для Firefox === */
@@ -521,10 +558,48 @@ html {
   scrollbar-color: var(--accent-primary) var(--bg-secondary);
 }
 
-/* === Line clamp utility === */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+/* === Предотвращение горизонтального скролла === */
+body, html, #root {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* === Контейнеры === */
+.container {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .container {
+    max-width: 1536px;
+  }
 }
