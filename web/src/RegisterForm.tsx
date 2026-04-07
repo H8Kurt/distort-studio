@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { PhotoIcon } from "@heroicons/react/24/solid";
 
 const AVATARS = [
   "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",

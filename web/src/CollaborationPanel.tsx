@@ -24,13 +24,12 @@ interface CollaborationPanelProps {
 }
 
 export default function CollaborationPanel({ 
-  projectId, 
   currentUserId,
   collaborators, 
   onInvite, 
   onRemove,
   onRoleChange 
-}: CollaborationPanelProps) {
+}: Omit<CollaborationPanelProps, 'projectId'>) {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<"editor" | "viewer">("viewer");
   const [inviting, setInviting] = useState(false);

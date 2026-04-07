@@ -29,12 +29,11 @@ interface VersionsPanelProps {
 }
 
 export default function VersionsPanel({ 
-  projectId, 
   versions, 
   onCreateVersion, 
   onRestoreVersion,
   onCompareVersions 
-}: VersionsPanelProps) {
+}: Omit<VersionsPanelProps, 'projectId'>) {
   const [newMessage, setNewMessage] = useState("");
   const [creating, setCreating] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<number[]>([]);

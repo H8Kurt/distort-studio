@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserIcon, SparklesIcon, CameraIcon, XMarkIcon } from "@heroicons/react/24/solid";
+import { UserIcon, SparklesIcon, XMarkIcon } from "@heroicons/react/24/solid";
 
 interface User {
   id: number;
