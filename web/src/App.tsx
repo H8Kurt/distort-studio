@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import {
   TrashIcon,
@@ -12,27 +12,7 @@ import {
   PhotoIcon,
   DocumentTextIcon,
   ChevronRightIcon,
-  UserIcon,
-  SwatchIcon,
-  HomeIcon,
-  CubeIcon,
-  Cog6ToothIcon,
-  BellIcon,
-  SearchIcon,
-  GridIcon,
-  ListBulletIcon,
-  HeartIcon,
-  EyeIcon,
-  ShareIcon,
-  BookmarkIcon,
-  ChatBubbleLeftRightIcon,
-  FireIcon,
-  TrophyIcon,
-  CalendarIcon,
-  LinkIcon,
-  MapPinIcon,
-  CameraIcon,
-  XMarkIcon
+  UserIcon
 } from "@heroicons/react/24/solid";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
@@ -465,7 +445,7 @@ function ProjectsPage({
 }
 
 // === Страница версий ===
-function VersionsPage({ token, currentUser, projects, projectId, setProjectId }: { token: string | null; currentUser: User | null; projects: Project[]; projectId: number | null; setProjectId: any; }) {
+function VersionsPage({ token, projects, projectId, setProjectId }: { token: string | null; projects: Project[]; projectId: number | null; setProjectId: any; }) {
   const [versions, setVersions] = useState<Version[]>([]);
 
   const fetchProjectVersions = async (id: number) => {
@@ -542,7 +522,6 @@ function VersionsPage({ token, currentUser, projects, projectId, setProjectId }:
       </div>
       
       <VersionsPanel
-        projectId={projectId}
         versions={versions}
         onCreateVersion={createVersion}
         onRestoreVersion={restoreVersion}
@@ -651,7 +630,6 @@ function CollabsPage({
       </div>
       
       <CollaborationPanel
-        projectId={projectId}
         currentUserId={currentUser!.id}
         collaborators={collaborators}
         onInvite={inviteCollaborator}
@@ -760,19 +738,11 @@ function ProfilePage({
 function MainLayout({ 
   children, 
   currentUser, 
-  logout,
-  activeTab,
-  setActiveTab,
-  projectId,
-  setProjectId
+  logout
 }: { 
   children: React.ReactNode; 
   currentUser: User | null; 
   logout: () => void;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  projectId: number | null;
-  setProjectId: (id: number | null) => void;
 }) {
   return (
     <div className="min-h-screen gradient-bg">
@@ -827,7 +797,7 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [media, setMedia] = useState<UploadFile[]>([]);
-  const [activeTab, setActiveTab] = useState<"media" | "versions" | "collabs" | "profile">("media");
+  // const [activeTab, setActiveTab] = useState<"media" | "versions" | "collabs" | "profile">("media");
 
   // === Проверка токена ===
   const checkToken = async (t: string | null) => {
@@ -982,10 +952,6 @@ function App() {
       <MainLayout 
         currentUser={currentUser} 
         logout={logout}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        projectId={projectId}
-        setProjectId={setProjectId}
       >
         <Routes>
           <Route 
@@ -1009,7 +975,6 @@ function App() {
             element={
               <VersionsPage 
                 token={token}
-                currentUser={currentUser}
                 projects={projects}
                 projectId={projectId}
                 setProjectId={setProjectId}
