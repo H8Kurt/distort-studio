@@ -797,7 +797,7 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [media, setMedia] = useState<UploadFile[]>([]);
-  // const [activeTab, setActiveTab] = useState<"media" | "versions" | "collabs" | "profile">("media");
+  const [activeTab, setActiveTab] = useState<"media" | "versions" | "collabs" | "profile">("media");
 
   // === Проверка токена ===
   const checkToken = async (t: string | null) => {
