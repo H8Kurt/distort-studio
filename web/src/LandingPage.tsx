@@ -5,15 +5,11 @@ import {
   ClockIcon,
   UserGroupIcon,
   ArrowRightIcon,
-  CheckCircleIcon,
   PlayCircleIcon,
   CodeBracketIcon,
   PhotoIcon,
   MusicalNoteIcon,
   FilmIcon,
-  GlobeAltIcon,
-  ShieldCheckIcon,
-  RocketLaunchIcon,
 } from "@heroicons/react/24/solid";
 import {
   ChevronDownIcon,
