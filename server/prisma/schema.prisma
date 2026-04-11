@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String?
+  displayName   String?
+  avatarUrl     String?
+  rebelRank     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  projects      Project[] @relation("Owner")
+  collabs       Collab[]
+  sessions      Session[]
+  apps          App[]
+  versions      Version[] @relation("Author")
+  comments      Comment[]
+  refreshToken  String?
+}
+
+model Project {
+  id            String      @id @default(uuid())
+  ownerId       String
+  owner         User        @relation("Owner", fields: [ownerId], references: [id])
+  name          String
+  description   String?
+  visibility    Visibility  @default(PRIVATE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  files         File[]
+  versions      Version[]
+  branches      Branch[]
+  collabs       Collab[]
+  sessions      Session[]
+  comments      Comment[]
+  parentProject Project?    @relation("ForkChain", fields: [parentProjectId], references: [id])
+  childProjects Project[]   @relation("ForkChain")
+  parentProjectId String?
+}
+
+model File {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id])
+  versionId     String?
+  version       Version? @relation(fields: [versionId], references: [id])
+  path          String   // relative path in project
+  storageKey    String   // S3 object key
+  size          Int
+  mimetype      String
+  checksum      String   // SHA256 for deduplication
+  createdAt     DateTime @default(now())
+
+  @@index([projectId])
+  @@index([checksum])
+}
+
+model Version {
+  id              String    @id @default(uuid())
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id])
+  parentId        String?   // for chain/history
+  parent          Version?  @relation("VersionChain", fields: [parentId], references: [id])
+  children        Version[] @relation("VersionChain")
+  authorId        String
+  author          User      @relation("Author", fields: [authorId], references: [id])
+  message         String?
+  manifest        Json      // {files: [{path, storageKey, checksum}]}
+  createdAt       DateTime  @default(now())
+  branches        Branch[]
+  comments        Comment[]
+
+  @@index([projectId])
+}
+
+model Branch {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  name        String   // "main", "feature-x", etc.
+  versionId   String
+  version     Version  @relation(fields: [versionId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+model Collab {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  role        Role     @default(VIEWER)
+  createdAt   DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+model Session {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id])
+  startTs         DateTime
+  endTs           DateTime?
+  durationSeconds Int?
+  meta            Json?     // {idleTime?, activeWindow?, etc.}
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+model App {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  name        String
+  path        String    // executable path
+  icon        String?
+  lastUsed    DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Comment {
+  id          String    @id @default(uuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  versionId   String?
+  version     Version?  @relation(fields: [versionId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  parentId    String?
+  parent      Comment?  @relation("CommentThread", fields: [parentId], references: [id])
+  replies     Comment[] @relation("CommentThread")
+  content     String
+  createdAt   DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([versionId])
+}
+
+enum Visibility {
+  PRIVATE
+  PUBLIC
+  TEAM
+}
+
+enum Role {
+  OWNER
+  EDITOR
+  VIEWER
+}
