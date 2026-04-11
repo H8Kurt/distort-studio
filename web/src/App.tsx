@@ -14,13 +14,12 @@ import {
   ChevronRightIcon,
   UserIcon
 } from "@heroicons/react/24/solid";
-import LoginForm from "./LoginForm";
-import RegisterForm from "./RegisterForm";
 import UploadForm from "./UploadForm";
 import ProfileEditForm from "./ProfileEditForm";
 import CollaborationPanel from "./CollaborationPanel";
 import VersionsPanel from "./VersionsPanel";
 import ThemeSwitcher from "./ThemeSwitcher";
+import LandingPage from "./LandingPage";
 import { io } from "socket.io-client";
 import "./styles/globals.css";
 
@@ -206,7 +205,6 @@ function ProjectsPage({
   setProjectId,
   media,
   setMedia,
-  setActiveTab
 }: { 
   token: string | null; 
   currentUser: User | null; 
@@ -216,7 +214,7 @@ function ProjectsPage({
   setProjectId: any;
   media: UploadFile[];
   setMedia: any;
-  setActiveTab: any;
+
 }) {
   const [newProject, setNewProject] = useState({ title: "", description: "" });
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
@@ -365,7 +363,7 @@ function ProjectsPage({
               {/* Вкладки навигации */}
               <div className="flex gap-2 border-t border-gray-700/50 pt-4">
                 <button
-                  onClick={() => setActiveTab("media")}
+                  onClick={() => {}}
                   className={`btn flex-1 ${true ? "btn-primary" : "btn-secondary"}`}
                 >
                   <PhotoIcon className="w-4 h-4" />
@@ -790,14 +788,12 @@ function App() {
   // Авторизация
   const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showRegister, setShowRegister] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Данные
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [media, setMedia] = useState<UploadFile[]>([]);
-  const [activeTab, setActiveTab] = useState<"media" | "versions" | "collabs" | "profile">("media");
 
   // === Проверка токена ===
   const checkToken = async (t: string | null) => {
@@ -906,44 +902,9 @@ function App() {
       </div>
     );
 
-  // === Если не авторизован ===
+  // === Если не авторизован - показываем лендинг ===
   if (!token || !currentUser) {
-    return (
-      <div className="min-h-screen gradient-bg flex flex-col justify-center py-12 px-4">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-gradient mb-2">Distort Studio</h1>
-          <p className="text-gray-400">Платформа для цифровых творцов</p>
-        </div>
-        
-        {!showRegister ? (
-          <>
-            <LoginForm onLogin={handleLogin} />
-            <p className="text-center mt-6 text-gray-400">
-              Нет аккаунта?{" "}
-              <button
-                onClick={() => setShowRegister(true)}
-                className="text-purple-400 hover:text-purple-300 underline decoration-purple-500/50"
-              >
-                Зарегистрироваться
-              </button>
-            </p>
-          </>
-        ) : (
-          <>
-            <RegisterForm />
-            <p className="text-center mt-6 text-gray-400">
-              Уже есть аккаунт?{" "}
-              <button
-                onClick={() => setShowRegister(false)}
-                className="text-purple-400 hover:text-purple-300 underline decoration-purple-500/50"
-              >
-                Войти
-              </button>
-            </p>
-          </>
-        )}
-      </div>
-    );
+    return <LandingPage onLogin={handleLogin} />;
   }
 
   // === Основной интерфейс с роутингом ===
@@ -966,7 +927,6 @@ function App() {
                 setProjectId={setProjectId}
                 media={media}
                 setMedia={setMedia}
-                setActiveTab={setActiveTab}
               />
             } 
           />
