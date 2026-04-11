@@ -1,15 +1,38 @@
-```
+```gitignore
 # Dependencies
 node_modules/
 
-# Environment
+# Build outputs
+dist/
+build/
+*.js.map
+*.ts.map
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment variables
 .env
 .env.local
 .env.*
 
-# Logs
-*.log
+# Editors
+.vscode/
+.idea/
 
-# Package manager
-package-lock.json
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS generated files
+.DS_Store
+Thumbs.db
 ```
