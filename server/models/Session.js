@@ -2,30 +2,17 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../db');
 
 const Session = sequelize.define('Session', {
-  userId: {
+  id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    primaryKey: true,
+    autoIncrement: true
   },
-  projectId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-  startTime: {
-    type: DataTypes.DATE,
-    allowNull: false,
-  },
-  endTime: {
-    type: DataTypes.DATE,
-    allowNull: true,
-  },
-  durationSeconds: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  meta: {
-    type: DataTypes.JSON,
-    defaultValue: {},
-  },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  projectId: { type: DataTypes.INTEGER, allowNull: false },
+  startTime: DataTypes.DATE,
+  endTime: DataTypes.DATE,
+  durationSeconds: { type: DataTypes.INTEGER, defaultValue: 0 },
+  meta: { type: DataTypes.JSON, defaultValue: {} }
 });
 
 module.exports = Session;

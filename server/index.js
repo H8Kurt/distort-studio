@@ -41,7 +41,7 @@ require("./models/associations");
 
 // === синхронизация БД ===
 sequelize
-  .sync({ alter: true })
+  .sync({ force: true })
   .then(() => console.log("✅ DB synced"))
   .catch(console.error);
 

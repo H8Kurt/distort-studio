@@ -3,36 +3,15 @@ const sequelize = require('../db');
 
 const Comment = sequelize.define('Comment', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
-  projectId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-  },
-  versionId: {
-    type: DataTypes.UUID,
-    allowNull: true,
-  },
-  userId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-  },
-  parentId: {
-    type: DataTypes.UUID,
-    allowNull: true,
-  },
-  content: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-  }
+  projectId: DataTypes.INTEGER,
+  versionId: DataTypes.INTEGER,
+  userId: DataTypes.INTEGER,
+  parentId: DataTypes.INTEGER,
+  content: DataTypes.TEXT
 });
-
-// Self-referential relation for threaded comments
-Comment.associate = (models) => {
-  Comment.belongsTo(Comment, { as: 'parent', foreignKey: 'parentId' });
-  Comment.hasMany(Comment, { as: 'replies', foreignKey: 'parentId' });
-};
 
 module.exports = Comment;

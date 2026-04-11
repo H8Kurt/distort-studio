@@ -2,26 +2,18 @@ const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
 const Media = sequelize.define("Media", {
-  filename: {
-    type: DataTypes.STRING,
-    allowNull: false,
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
+  filename: DataTypes.STRING,
   originalName: DataTypes.STRING,
   mime: DataTypes.STRING,
   size: DataTypes.INTEGER,
-
   url: DataTypes.STRING,
   thumbUrl: DataTypes.STRING,
-
-  type: {
-    type: DataTypes.STRING, // image | audio
-  },
-
-  // 🔥 ВАЖНО: ЯВНОЕ ПОЛЕ
-  ProjectId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
+  type: DataTypes.STRING
 });
 
 module.exports = Media;
