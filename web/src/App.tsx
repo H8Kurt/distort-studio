@@ -235,18 +235,28 @@ function MediaCard({ media }: { media: UploadFile }) {
     <div className="group relative bg-gray-800/50 rounded-xl overflow-hidden border border-gray-700/50 hover:border-purple-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10">
       <div className="aspect-square flex items-center justify-center bg-gray-900/50">
         {media.type === "image" ? (
-          <img
-            src={`http://localhost:4000${media.thumbUrl || media.url}`}
-            alt={media.originalName || "файл"}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-          />
+          <>
+            <img
+              src={`http://localhost:4000${media.thumbUrl || media.url}`}
+              alt={media.originalName || "файл"}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            />
+            <a
+              href={`http://localhost:4000/api/projects/media/${media.filename}/download`}
+              download
+              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50"
+            >
+              <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </a>
+          </>
         ) : (
           <div className="text-center p-4">
             <DocumentTextIcon className="w-12 h-12 text-purple-400 mx-auto mb-2" />
             <a
-              href={`http://localhost:4000${media.url}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={`http://localhost:4000/api/projects/media/${media.filename}/download`}
+              download
               className="text-sm text-purple-400 hover:text-purple-300 underline decoration-purple-500/50"
             >
               {media.originalName || "Скачать файл"}
@@ -284,13 +294,15 @@ function ProjectsPage({
   setMedia: any;
 
 }) {
-  const [newProject, setNewProject] = useState({ title: "", description: "" });
+  const [newProject, setNewProject] = useState({ title: "", description: "", visibility: "PRIVATE" as 'PRIVATE' | 'PUBLIC' | 'TEAM' });
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [visibilityFilter, setVisibilityFilter] = useState<string>("");
 
   const addProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProject.title) return;
-    await fetch("http://localhost:4000/api/projects", {
+    const res = await fetch("http://localhost:4000/api/projects", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -299,16 +311,20 @@ function ProjectsPage({
       body: JSON.stringify({
         title: newProject.title,
         description: newProject.description,
-        UserId: currentUser?.id || 1,
+        visibility: newProject.visibility,
       }),
     });
-    setNewProject({ title: "", description: "" });
+    const created = await res.json();
+    setNewProject({ title: "", description: "", visibility: "PRIVATE" });
     setShowNewProjectForm(false);
-    setProjects((prev: Project[]) => [...prev, { ...newProject, id: Date.now(), UserId: currentUser?.id }]);
+    setProjects((prev: Project[]) => [...prev, created]);
   };
 
   const deleteProject = async (id: number) => {
-    await fetch(`http://localhost:4000/api/projects/${id}`, { method: "DELETE" });
+    await fetch(`http://localhost:4000/api/projects/${id}`, { 
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
     if (projectId === id) {
       setProjectId(null);
       setMedia([]);
@@ -319,14 +335,22 @@ function ProjectsPage({
   const editProject = async (
     id: number,
     newTitle: string,
-    newDescription: string
+    newDescription: string,
+    newVisibility?: string
   ) => {
     await fetch(`http://localhost:4000/api/projects/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newTitle, description: newDescription }),
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ 
+        title: newTitle, 
+        description: newDescription,
+        visibility: newVisibility
+      }),
     });
-    setProjects((prev: Project[]) => prev.map(p => p.id === id ? { ...p, title: newTitle, description: newDescription } : p));
+    setProjects((prev: Project[]) => prev.map(p => p.id === id ? { ...p, title: newTitle, description: newDescription, visibility: newVisibility || p.visibility } : p));
   };
 
   return (
@@ -338,13 +362,44 @@ function ProjectsPage({
             <FolderIcon className="w-6 h-6 text-purple-400" />
             Проекты
           </h2>
-          <button 
-            onClick={() => setShowNewProjectForm(!showNewProjectForm)}
-            className="btn btn-primary btn-icon"
-            data-tooltip="Новый проект"
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              className="btn btn-sm btn-secondary"
+              data-tooltip={viewMode === "grid" ? "Список" : "Сетка"}
+            >
+              {viewMode === "grid" ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              )}
+            </button>
+            <button 
+              onClick={() => setShowNewProjectForm(!showNewProjectForm)}
+              className="btn btn-primary btn-icon"
+              data-tooltip="Новый проект"
+            >
+              <PlusIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Фильтры */}
+        <div className="flex gap-2 mb-4">
+          <select
+            className="input text-sm py-1"
+            value={visibilityFilter}
+            onChange={(e) => setVisibilityFilter(e.target.value)}
           >
-            <PlusIcon className="w-5 h-5" />
-          </button>
+            <option value="">Все статусы</option>
+            <option value="PUBLIC">Публичные</option>
+            <option value="PRIVATE">Приватные</option>
+            <option value="TEAM">Командные</option>
+          </select>
         </div>
         
         {/* Форма нового проекта */}
@@ -364,6 +419,15 @@ function ProjectsPage({
               value={newProject.description}
               onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
             />
+            <select
+              className="input"
+              value={newProject.visibility}
+              onChange={(e) => setNewProject({ ...newProject, visibility: e.target.value as 'PRIVATE' | 'PUBLIC' | 'TEAM' })}
+            >
+              <option value="PRIVATE">Приватный</option>
+              <option value="PUBLIC">Публичный</option>
+              <option value="TEAM">Командный</option>
+            </select>
             <div className="flex gap-2">
               <button type="submit" className="btn btn-primary flex-1">
                 <PlusIcon className="w-4 h-4" />
@@ -381,27 +445,31 @@ function ProjectsPage({
         )}
         
         {/* Список проектов */}
-        <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-          {projects.map((p) => (
+        <div className={`${viewMode === "grid" ? "grid grid-cols-1 gap-2" : "space-y-2"} max-h-[calc(100vh-350px)] overflow-y-auto pr-2`}>
+          {projects
+            .filter(p => !visibilityFilter || p.visibility === visibilityFilter)
+            .map((p) => (
             <ProjectCard
               key={p.id}
               project={p}
               isSelected={projectId === p.id}
               onSelect={() => setProjectId(p.id)}
-              onEdit={() => editProject(
-                p.id,
-                prompt("Новое название", p.title) || p.title,
-                prompt("Описание", p.description) || p.description
-              )}
+              onEdit={() => {
+                const newTitle = prompt("Новое название", p.title) || p.title;
+                const newDescription = prompt("Описание", p.description) || p.description;
+                const newVisibility = prompt("Статус (PRIVATE/PUBLIC/TEAM)", p.visibility || "PRIVATE") || p.visibility;
+                editProject(p.id, newTitle, newDescription, newVisibility);
+              }}
               onDelete={() => {
                 if (confirm(`Удалить проект "${p.title}"?`)) {
                   deleteProject(p.id);
                 }
               }}
+              viewMode={viewMode}
             />
           ))}
           
-          {projects.length === 0 && (
+          {projects.filter(p => !visibilityFilter || p.visibility === visibilityFilter).length === 0 && (
             <div className="text-center py-8 text-gray-400">
               <FolderIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>Нет проектов</p>

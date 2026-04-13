@@ -4,10 +4,14 @@ const multer = require("multer");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
+const { Op } = require("sequelize");
 
 const auth = require("../middleware/auth");
 const Project = require("../models/Project");
 const Media = require("../models/Media");
+const Collab = require("../models/Collab");
+const User = require("../models/User");
+const sequelize = require("../db");
 
 
 // =========================
@@ -38,16 +42,47 @@ const upload = multer({ storage });
 // =========================
 
 // Получить все проекты
-router.get("/", async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
     const { visibility, view } = req.query;
     const where = {};
+    
+    // Если не админ, показываем только публичные и свои проекты
+    if (req.user.role !== 'admin') {
+      where[Op.or] = [
+        { visibility: 'PUBLIC' },
+        { UserId: req.user.id }
+      ];
+      
+      // Также добавляем проекты где пользователь является коллаборатором
+      const collabs = await Collab.findAll({ 
+        where: { userId: req.user.id },
+        attributes: ['projectId']
+      });
+      const collabProjectIds = collabs.map(c => c.projectId);
+      
+      if (collabProjectIds.length > 0) {
+        where[Op.or].push({ id: { [Op.in]: collabProjectIds } });
+      }
+    }
     
     if (visibility) {
       where.visibility = visibility;
     }
     
-    const projects = await Project.findAll({ where });
+    const projects = await Project.findAll({ 
+      where,
+      include: [
+        { model: User, as: 'owner', attributes: ['id', 'username'] },
+        { model: Media, attributes: [] }
+      ],
+      attributes: {
+        include: [
+          [sequelize.fn('COUNT', sequelize.col('Media.id')), 'mediaCount']
+        ]
+      },
+      group: ['Project.id']
+    });
     res.json(projects);
   } catch (err) {
     console.error("Ошибка получения проектов:", err);
@@ -88,6 +123,17 @@ router.put("/:id", auth, async (req, res) => {
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ error: "Проект не найден" });
 
+    // Проверяем права доступа
+    const isOwner = project.UserId === req.user.id;
+    const isCollab = await Collab.findOne({ 
+      where: { projectId: id, userId: req.user.id },
+      where: { role: { [Op.in]: ['owner', 'editor'] } }
+    });
+    
+    if (!isOwner && !isCollab) {
+      return res.status(403).json({ error: "Нет прав для редактирования проекта" });
+    }
+
     project.title = title;
     project.description = description;
     if (visibility) project.visibility = visibility;
@@ -107,6 +153,15 @@ router.put("/:id", auth, async (req, res) => {
 router.delete("/:id", auth, async (req, res) => {
   try {
     const id = req.params.id;
+    const project = await Project.findByPk(id);
+    
+    if (!project) return res.status(404).json({ error: "Проект не найден" });
+    
+    // Проверяем права - только владелец может удалить
+    if (project.UserId !== req.user.id) {
+      return res.status(403).json({ error: "Только владелец может удалить проект" });
+    }
+    
     await Project.destroy({ where: { id } });
 
     const io = req.app.get("io");
@@ -175,9 +230,27 @@ router.post(
     }
   }
 );
-router.get("/:id/media", async (req, res) => {
+// Получить медиа проекта с проверкой доступа
+router.get("/:id/media", auth, async (req, res) => {
   try {
     const projectId = req.params.id;
+    
+    // Проверяем доступ к проекту
+    const project = await Project.findByPk(projectId);
+    if (!project) {
+      return res.status(404).json({ error: "Проект не найден" });
+    }
+    
+    // Проверяем права доступа
+    const isOwner = project.UserId === req.user.id;
+    const isPublic = project.visibility === 'PUBLIC';
+    const isCollab = await Collab.findOne({ 
+      where: { projectId, userId: req.user.id }
+    });
+    
+    if (!isOwner && !isPublic && !isCollab) {
+      return res.status(403).json({ error: "Нет доступа к проекту" });
+    }
 
     const media = await Media.findAll({
       where: { ProjectId: projectId },
@@ -190,4 +263,39 @@ router.get("/:id/media", async (req, res) => {
     res.status(500).json({ error: "Ошибка загрузки медиа проекта" });
   }
 });
+
+// Скачать файл
+router.get("/media/:filename/download", auth, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const media = await Media.findOne({ where: { filename } });
+    
+    if (!media) {
+      return res.status(404).json({ error: "Файл не найден" });
+    }
+    
+    // Проверяем доступ к проекту
+    const project = await Project.findByPk(media.ProjectId);
+    if (!project) {
+      return res.status(404).json({ error: "Проект не найден" });
+    }
+    
+    const isOwner = project.UserId === req.user.id;
+    const isPublic = project.visibility === 'PUBLIC';
+    const isCollab = await Collab.findOne({ 
+      where: { projectId: media.ProjectId, userId: req.user.id }
+    });
+    
+    if (!isOwner && !isPublic && !isCollab) {
+      return res.status(403).json({ error: "Нет доступа к файлу" });
+    }
+    
+    const filePath = path.join(__dirname, '..', media.url.replace('/uploads/', 'uploads/'));
+    res.download(filePath, media.originalName || filename);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Ошибка скачивания файла" });
+  }
+});
+
 module.exports = router;
