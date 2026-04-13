@@ -21,6 +21,7 @@ import VersionsPanel from "./VersionsPanel";
 import ThemeSwitcher from "./ThemeSwitcher";
 import LandingPage from "./LandingPage";
 import { io } from "socket.io-client";
+import "./styles/globals.css";
 
 const socket = io("http://localhost:4000");
 
@@ -275,6 +276,7 @@ function MediaCard({ media }: { media: UploadFile }) {
 // === Страница проектов (главная) ===
 function ProjectsPage({ 
   token, 
+  currentUser, 
   projects, 
   setProjects, 
   projectId, 
@@ -283,6 +285,7 @@ function ProjectsPage({
   setMedia,
 }: { 
   token: string | null; 
+  currentUser: User | null; 
   projects: Project[]; 
   setProjects: any;
   projectId: number | null; 
@@ -1213,6 +1216,7 @@ function App() {
             element={
               <ProjectsPage 
                 token={token}
+                currentUser={currentUser}
                 projects={projects}
                 setProjects={setProjects}
                 projectId={projectId}
