@@ -369,34 +369,14 @@ function ProjectsPage({
                   <PhotoIcon className="w-4 h-4" />
                   Медиа
                 </button>
-                <button
-                  onClick={() => window.location.href = '/versions'}
-                  className="btn btn-secondary flex-1"
-                >
+                <a href={`/versions`} className="btn btn-secondary flex-1">
                   <FolderIcon className="w-4 h-4" />
                   Версии
-                </button>
-                <button
-                  onClick={() => window.location.href = '/collabs'}
-                  className="btn btn-secondary flex-1"
-                >
+                </a>
+                <a href={`/collabs`} className="btn btn-secondary flex-1">
                   <UserGroupIcon className="w-4 h-4" />
                   Коллабы
-                </button>
-                <button
-                  onClick={() => window.location.href = '/sessions'}
-                  className="btn btn-secondary flex-1"
-                >
-                  <ClockIcon className="w-4 h-4" />
-                  Сессии
-                </button>
-                <button
-                  onClick={() => window.location.href = '/profile'}
-                  className="btn btn-secondary flex-1"
-                >
-                  <UserIcon className="w-4 h-4" />
-                  Профиль
-                </button>
+                </a>
               </div>
             </div>
 
@@ -463,10 +443,9 @@ function VersionsPage({ token, projects, projectId, setProjectId }: { token: str
       const res = await fetch(`http://localhost:4000/api/projects/${id}/versions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setVersions(data);
-      }
+      if (!res.ok) throw new Error("Failed to fetch versions");
+      const data = await res.json();
+      setVersions(data);
     } catch (err) {
       console.error("Ошибка загрузки версий:", err);
       setVersions([]);
@@ -478,10 +457,9 @@ function VersionsPage({ token, projects, projectId, setProjectId }: { token: str
       const res = await fetch(`http://localhost:4000/api/projects/${id}/branches`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setBranches(data);
-      }
+      if (!res.ok) throw new Error("Failed to fetch branches");
+      const data = await res.json();
+      setBranches(data);
     } catch (err) {
       console.error("Ошибка загрузки веток:", err);
       setBranches([]);
@@ -493,7 +471,7 @@ function VersionsPage({ token, projects, projectId, setProjectId }: { token: str
       fetchProjectVersions(projectId);
       fetchProjectBranches(projectId);
     }
-  }, [projectId]);
+  }, [projectId, token]);
 
   const createVersion = async (message: string) => {
     const res = await fetch(`http://localhost:4000/api/projects/${projectId}/versions`, {
@@ -708,10 +686,9 @@ function CollabsPage({
       const res = await fetch(`http://localhost:4000/api/projects/${id}/collabs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setCollaborators(data);
-      }
+      if (!res.ok) throw new Error("Failed to fetch collaborators");
+      const data = await res.json();
+      setCollaborators(data);
     } catch (err) {
       console.error("Ошибка загрузки коллабораторов:", err);
       setCollaborators([]);
@@ -722,7 +699,7 @@ function CollabsPage({
     if (projectId) {
       fetchProjectCollaborators(projectId);
     }
-  }, [projectId]);
+  }, [projectId, token]);
 
   const inviteCollaborator = async (userId: number, role: "editor" | "viewer" | "owner") => {
     const res = await fetch(`http://localhost:4000/api/projects/${projectId}/collabs`, {
@@ -916,11 +893,20 @@ function MainLayout({
                   <p className="text-xs text-gray-400">Добро пожаловать, {currentUser?.username}</p>
                 </div>
               </div>
+              
+              {/* Навигация в навбаре */}
+              <nav className="hidden md:flex items-center gap-2 ml-8">
+                <a href="/" className="btn btn-sm btn-secondary">Проекты</a>
+                <a href="/sessions" className="btn btn-sm btn-secondary">Сессии</a>
+              </nav>
             </div>
             
             <div className="flex items-center gap-3">
               <ThemeSwitcher />
-              <Avatar username={currentUser?.username || ""} url={currentUser?.avatarUrl} />
+              <a href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <Avatar username={currentUser?.username || ""} url={currentUser?.avatarUrl} />
+                <span className="text-sm text-gray-300 hidden lg:inline">{currentUser?.username}</span>
+              </a>
               <button
                 onClick={logout}
                 className="btn btn-danger"
@@ -1155,10 +1141,9 @@ function SessionsPage({
       const res = await fetch(`http://localhost:4000/api/sessions/my`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-      }
+      if (!res.ok) throw new Error("Failed to fetch sessions");
+      const data = await res.json();
+      setSessions(data);
     } catch (err) {
       console.error("Ошибка загрузки сессий:", err);
       setSessions([]);
@@ -1167,7 +1152,7 @@ function SessionsPage({
 
   useEffect(() => {
     fetchMySessions();
-  }, []);
+  }, [token]);
 
   const startSession = async () => {
     if (!selectedProjectId || !startTime) {
