@@ -93,13 +93,13 @@ router.get("/", auth, async (req, res) => {
 // Создать проект (авторизованный пользователь)
 router.post("/", auth, async (req, res) => {
   try {
-    const { title, description, UserId, visibility } = req.body;
+    const { title, description, visibility } = req.body;
     if (!title) return res.status(400).json({ error: "Введите название проекта" });
 
     const project = await Project.create({ 
       title, 
       description, 
-      UserId,
+      UserId: req.user.id,
       visibility: visibility || 'PRIVATE'
     });
 
