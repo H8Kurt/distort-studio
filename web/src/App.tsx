@@ -1067,7 +1067,6 @@ function MainLayout({
 function App() {
   // Авторизация
   const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
-  const [refreshToken, setRefreshToken] = useState<string | null>(localStorage.getItem("refreshToken"));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -1091,51 +1090,16 @@ function App() {
     }
   };
 
-  const handleLogin = (t: string, rt?: string) => {
+  const handleLogin = (t: string) => {
     localStorage.setItem("token", t);
     setToken(t);
-    if (rt) {
-      localStorage.setItem("refreshToken", rt);
-      setRefreshToken(rt);
-    }
     checkToken(t);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
     setToken(null);
-    setRefreshToken(null);
     setCurrentUser(null);
-  };
-
-  // === Обновление токена ===
-  const refreshAccessToken = async (): Promise<string | null> => {
-    const rt = refreshToken || localStorage.getItem("refreshToken");
-    if (!rt) return null;
-
-    try {
-      const res = await fetch("http://localhost:4000/api/auth/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: rt }),
-      });
-
-      if (!res.ok) throw new Error("Failed to refresh token");
-
-      const data = await res.json();
-      localStorage.setItem("token", data.token);
-      setToken(data.token);
-      if (data.refreshToken) {
-        localStorage.setItem("refreshToken", data.refreshToken);
-        setRefreshToken(data.refreshToken);
-      }
-      return data.token;
-    } catch (err) {
-      console.error("Token refresh failed:", err);
-      logout();
-      return null;
-    }
   };
 
   const fetchProjects = async () => {
@@ -1146,22 +1110,7 @@ function App() {
       
       if (!res.ok) {
         if (res.status === 401) {
-          // Пытаемся обновить токен
-          const newToken = await refreshAccessToken();
-          if (!newToken) {
-            logout();
-            return;
-          }
-          // Повторяем запрос с новым токеном
-          const retryRes = await fetch("http://localhost:4000/api/projects", {
-            headers: { Authorization: `Bearer ${newToken}` },
-          });
-          if (!retryRes.ok) {
-            logout();
-            return;
-          }
-          const data = await retryRes.json();
-          setProjects(Array.isArray(data) ? data : []);
+          logout();
           return;
         }
         throw new Error(`Ошибка загрузки проектов: ${res.status}`);
