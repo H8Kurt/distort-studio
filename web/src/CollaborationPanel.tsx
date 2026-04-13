@@ -18,7 +18,7 @@ interface CollaborationPanelProps {
   projectId: number;
   currentUserId: number;
   collaborators: Collaborator[];
-  onInvite: (email: string, role: "editor" | "viewer") => Promise<void>;
+  onInvite: (userId: number, role: "editor" | "viewer" | "owner") => Promise<void>;
   onRemove: (userId: number) => Promise<void>;
   onRoleChange: (userId: number, role: "editor" | "viewer") => Promise<void>;
 }
@@ -30,27 +30,27 @@ export default function CollaborationPanel({
   onRemove,
   onRoleChange 
 }: Omit<CollaborationPanelProps, 'projectId'>) {
-  const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState<"editor" | "viewer">("viewer");
+  const [newUserId, setNewUserId] = useState<number | null>(null);
+  const [newRole, setNewRole] = useState<"editor" | "viewer" | "owner">("viewer");
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEmail.trim()) return;
+    if (!newUserId) return;
     
     setInviting(true);
     setError(null);
     setSuccess(null);
     
     try {
-      await onInvite(newEmail, newRole);
-      setNewEmail("");
-      setSuccess("Приглашение отправлено!");
+      await onInvite(newUserId, newRole);
+      setNewUserId(null);
+      setSuccess("Участник добавлен!");
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      setError(err.message || "Ошибка приглашения");
+      setError(err.message || "Ошибка добавления участника");
     } finally {
       setInviting(false);
     }
@@ -102,14 +102,14 @@ export default function CollaborationPanel({
             <div className="flex items-start gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Email для приглашения
+                  ID пользователя
                 </label>
                 <input
                   className="input"
-                  placeholder="colleague@example.com"
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="123"
+                  type="number"
+                  value={newUserId || ""}
+                  onChange={(e) => setNewUserId(e.target.value ? Number(e.target.value) : null)}
                   disabled={inviting}
                 />
               </div>
@@ -121,21 +121,22 @@ export default function CollaborationPanel({
                 <select
                   className="input"
                   value={newRole}
-                  onChange={(e) => setNewRole(e.target.value as "editor" | "viewer")}
+                  onChange={(e) => setNewRole(e.target.value as "editor" | "viewer" | "owner")}
                   disabled={inviting}
                 >
                   <option value="viewer">Наблюдатель</option>
                   <option value="editor">Редактор</option>
+                  <option value="owner">Владелец</option>
                 </select>
               </div>
               
               <button
                 type="submit"
-                disabled={!newEmail.trim() || inviting}
+                disabled={!newUserId || inviting}
                 className="btn btn-primary mt-[22px]"
               >
                 <PlusIcon className="w-5 h-5" />
-                {inviting ? "Отправка..." : "Пригласить"}
+                {inviting ? "Добавление..." : "Добавить"}
               </button>
             </div>
             

@@ -384,6 +384,13 @@ function ProjectsPage({
                   Коллабы
                 </button>
                 <button
+                  onClick={() => window.location.href = '/sessions'}
+                  className="btn btn-secondary flex-1"
+                >
+                  <ClockIcon className="w-4 h-4" />
+                  Сессии
+                </button>
+                <button
                   onClick={() => window.location.href = '/profile'}
                   className="btn btn-secondary flex-1"
                 >
@@ -445,6 +452,11 @@ function ProjectsPage({
 // === Страница версий ===
 function VersionsPage({ token, projects, projectId, setProjectId }: { token: string | null; projects: Project[]; projectId: number | null; setProjectId: any; }) {
   const [versions, setVersions] = useState<Version[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [showForkModal, setShowForkModal] = useState(false);
+  const [forkName, setForkName] = useState("");
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [branchName, setBranchName] = useState("");
 
   const fetchProjectVersions = async (id: number) => {
     try {
@@ -461,9 +473,25 @@ function VersionsPage({ token, projects, projectId, setProjectId }: { token: str
     }
   };
 
+  const fetchProjectBranches = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/projects/${id}/branches`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBranches(data);
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки веток:", err);
+      setBranches([]);
+    }
+  };
+
   useEffect(() => {
     if (projectId) {
       fetchProjectVersions(projectId);
+      fetchProjectBranches(projectId);
     }
   }, [projectId]);
 
@@ -490,6 +518,54 @@ function VersionsPage({ token, projects, projectId, setProjectId }: { token: str
     await fetchProjectVersions(projectId!);
   };
 
+  const forkProject = async () => {
+    if (!forkName.trim()) {
+      alert("Введите название форка");
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:4000/api/projects/${projectId}/fork`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ name: forkName }),
+      });
+      if (!res.ok) throw new Error("Failed to fork project");
+      const forkedProject = await res.json();
+      alert(`Проект успешно форкнут! Новый проект ID: ${forkedProject.id}`);
+      setShowForkModal(false);
+      setForkName("");
+      // Можно перенаправить на новый проект
+    } catch (err: any) {
+      alert(err.message || "Ошибка создания форка");
+    }
+  };
+
+  const createBranch = async () => {
+    if (!branchName.trim()) {
+      alert("Введите название ветки");
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:4000/api/projects/${projectId}/branches`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ name: branchName }),
+      });
+      if (!res.ok) throw new Error("Failed to create branch");
+      await fetchProjectBranches(projectId!);
+      setShowBranchModal(false);
+      setBranchName("");
+    } catch (err: any) {
+      alert(err.message || "Ошибка создания ветки");
+    }
+  };
+
   const compareVersions = (v1: number, v2: number) => {
     alert(`Сравнение версий ${v1} и ${v2}\n(Функционал в разработке)`);
   };
@@ -513,11 +589,93 @@ function VersionsPage({ token, projects, projectId, setProjectId }: { token: str
         <button onClick={() => setProjectId(null)} className="btn btn-secondary mb-4">
           ← Назад к проектам
         </button>
-        <h2 className="text-2xl font-bold text-white">
-          {projects.find(p => p.id === projectId)?.title || "Проект"}
-        </h2>
-        <p className="text-gray-400">Управление версиями проекта</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              {projects.find(p => p.id === projectId)?.title || "Проект"}
+            </h2>
+            <p className="text-gray-400">Управление версиями проекта</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setShowForkModal(true)} className="btn btn-secondary">
+              <FolderIcon className="w-4 h-4" />
+              Форк проекта
+            </button>
+            <button onClick={() => setShowBranchModal(true)} className="btn btn-primary">
+              <PlusIcon className="w-4 h-4" />
+              Создать ветку
+            </button>
+          </div>
+        </div>
       </div>
+      
+      {/* Модальное окно форка */}
+      {showForkModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 border border-gray-700">
+            <h3 className="text-xl font-bold text-white mb-4">Создать форк проекта</h3>
+            <input
+              className="input w-full mb-4"
+              placeholder="Название форка"
+              value={forkName}
+              onChange={(e) => setForkName(e.target.value)}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={forkProject} className="btn btn-primary flex-1">
+                Создать форк
+              </button>
+              <button onClick={() => { setShowForkModal(false); setForkName(""); }} className="btn btn-secondary">
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно создания ветки */}
+      {showBranchModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 border border-gray-700">
+            <h3 className="text-xl font-bold text-white mb-4">Создать ветку</h3>
+            <input
+              className="input w-full mb-4"
+              placeholder="Название ветки"
+              value={branchName}
+              onChange={(e) => setBranchName(e.target.value)}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={createBranch} className="btn btn-primary flex-1">
+                Создать
+              </button>
+              <button onClick={() => { setShowBranchModal(false); setBranchName(""); }} className="btn btn-secondary">
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Список веток */}
+      {branches.length > 0 && (
+        <div className="card mb-6">
+          <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <FolderIcon className="w-5 h-5 text-purple-400" />
+            Ветки проекта
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {branches.map((branch) => (
+              <div key={branch.id} className="px-3 py-2 bg-gray-700/50 rounded-lg border border-gray-600">
+                <span className="text-sm text-white font-medium">{branch.name}</span>
+                {branch.Version && (
+                  <span className="text-xs text-gray-400 ml-2">v{branch.Version.id}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       <VersionsPanel
         versions={versions}
@@ -547,7 +705,7 @@ function CollabsPage({
 
   const fetchProjectCollaborators = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/projects/${id}/collaborators`, {
+      const res = await fetch(`http://localhost:4000/api/projects/${id}/collabs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -566,14 +724,14 @@ function CollabsPage({
     }
   }, [projectId]);
 
-  const inviteCollaborator = async (email: string, role: "editor" | "viewer") => {
-    const res = await fetch(`http://localhost:4000/api/projects/${projectId}/invite`, {
+  const inviteCollaborator = async (userId: number, role: "editor" | "viewer" | "owner") => {
+    const res = await fetch(`http://localhost:4000/api/projects/${projectId}/collabs`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}` 
       },
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({ userId, role }),
     });
     if (!res.ok) throw new Error("Failed to invite");
     await fetchProjectCollaborators(projectId!);
@@ -963,9 +1121,196 @@ function App() {
               />
             } 
           />
+          <Route 
+            path="/sessions" 
+            element={
+              <SessionsPage 
+                token={token}
+                projects={projects}
+              />
+            } 
+          />
         </Routes>
       </MainLayout>
     </BrowserRouter>
+  );
+}
+
+// === Страница сессий ===
+function SessionsPage({ 
+  token, 
+  projects
+}: { 
+  token: string | null; 
+  projects: Project[]; 
+}) {
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+
+  const fetchMySessions = async () => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/sessions/my`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data);
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки сессий:", err);
+      setSessions([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchMySessions();
+  }, []);
+
+  const startSession = async () => {
+    if (!selectedProjectId || !startTime) {
+      alert("Выберите проект и укажите время начала");
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:4000/api/sessions`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ 
+          projectId: selectedProjectId, 
+          startTime,
+          endTime: endTime || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to start session");
+      await fetchMySessions();
+      setShowStartModal(false);
+      setStartTime("");
+      setEndTime("");
+      setSelectedProjectId(null);
+    } catch (err: any) {
+      alert(err.message || "Ошибка создания сессии");
+    }
+  };
+
+  const stopSession = async (sessionId: number) => {
+    if (!confirm("Завершить эту сессию?")) return;
+    try {
+      const res = await fetch(`http://localhost:4000/api/sessions/${sessionId}/stop`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ endTime: new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error("Failed to stop session");
+      await fetchMySessions();
+    } catch (err: any) {
+      alert(err.message || "Ошибка завершения сессии");
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Мои сессии</h2>
+          <p className="text-gray-400">История рабочих сессий</p>
+        </div>
+        <button onClick={() => setShowStartModal(true)} className="btn btn-primary">
+          <ClockIcon className="w-4 h-4" />
+          Начать сессию
+        </button>
+      </div>
+
+      {/* Модальное окно начала сессии */}
+      {showStartModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 border border-gray-700">
+            <h3 className="text-xl font-bold text-white mb-4">Начать сессию</h3>
+            
+            <label className="block text-sm text-gray-300 mb-1">Проект</label>
+            <select
+              className="input w-full mb-4"
+              value={selectedProjectId || ""}
+              onChange={(e) => setSelectedProjectId(Number(e.target.value))}
+            >
+              <option value="">Выберите проект</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
+
+            <label className="block text-sm text-gray-300 mb-1">Время начала</label>
+            <input
+              type="datetime-local"
+              className="input w-full mb-4"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+
+            <label className="block text-sm text-gray-300 mb-1">Время окончания (опционально)</label>
+            <input
+              type="datetime-local"
+              className="input w-full mb-4"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+
+            <div className="flex gap-2">
+              <button onClick={startSession} className="btn btn-primary flex-1">
+                Начать
+              </button>
+              <button onClick={() => { setShowStartModal(false); setStartTime(""); setEndTime(""); setSelectedProjectId(null); }} className="btn btn-secondary">
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Список сессий */}
+      {sessions.length > 0 ? (
+        <div className="space-y-3">
+          {sessions.map((session) => (
+            <div key={session.id} className="card flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                  <ClockIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-white">{session.Project?.title || "Проект"}</h4>
+                  <p className="text-sm text-gray-400">
+                    {new Date(session.startTime).toLocaleString('ru-RU')}
+                    {session.endTime && ` - ${new Date(session.endTime).toLocaleString('ru-RU')}`}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Длительность: {Math.floor(session.durationSeconds / 60)} мин.
+                  </p>
+                </div>
+              </div>
+              {!session.endTime && (
+                <button onClick={() => stopSession(session.id)} className="btn btn-danger">
+                  Завершить
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-16 card">
+          <ClockIcon className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+          <p className="text-gray-400 text-lg mb-2">Нет сессий</p>
+          <p className="text-gray-500 text-sm">Начните свою первую рабочую сессию</p>
+        </div>
+      )}
+    </div>
   );
 }
 
