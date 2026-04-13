@@ -40,7 +40,14 @@ const upload = multer({ storage });
 // Получить все проекты
 router.get("/", async (req, res) => {
   try {
-    const projects = await Project.findAll();
+    const { visibility, view } = req.query;
+    const where = {};
+    
+    if (visibility) {
+      where.visibility = visibility;
+    }
+    
+    const projects = await Project.findAll({ where });
     res.json(projects);
   } catch (err) {
     console.error("Ошибка получения проектов:", err);
@@ -51,10 +58,15 @@ router.get("/", async (req, res) => {
 // Создать проект (авторизованный пользователь)
 router.post("/", auth, async (req, res) => {
   try {
-    const { title, description, UserId } = req.body;
+    const { title, description, UserId, visibility } = req.body;
     if (!title) return res.status(400).json({ error: "Введите название проекта" });
 
-    const project = await Project.create({ title, description, UserId });
+    const project = await Project.create({ 
+      title, 
+      description, 
+      UserId,
+      visibility: visibility || 'PRIVATE'
+    });
 
     // уведомляем всех клиентов
     const io = req.app.get("io");
@@ -71,13 +83,14 @@ router.post("/", auth, async (req, res) => {
 router.put("/:id", auth, async (req, res) => {
   try {
     const id = req.params.id;
-    const { title, description } = req.body;
+    const { title, description, visibility } = req.body;
 
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ error: "Проект не найден" });
 
     project.title = title;
     project.description = description;
+    if (visibility) project.visibility = visibility;
     await project.save();
 
     const io = req.app.get("io");
