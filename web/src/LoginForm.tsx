@@ -3,7 +3,7 @@ import { useState } from "react";
 export default function LoginForm({
   onLogin,
 }: {
-  onLogin: (token: string, refreshToken?: string) => void;
+  onLogin: (token: string) => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,10 +27,7 @@ export default function LoginForm({
       if (!res.ok) throw new Error(data.error || "Ошибка входа");
 
       localStorage.setItem("token", data.token);
-      if (data.refreshToken) {
-        localStorage.setItem("refreshToken", data.refreshToken);
-      }
-      onLogin(data.token, data.refreshToken);
+      onLogin(data.token);
     } catch (err: any) {
       setError(err.message || "Ошибка входа");
     } finally {

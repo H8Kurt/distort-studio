@@ -20,7 +20,7 @@ import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 
 interface LandingPageProps {
-  onLogin: (token: string, refreshToken?: string) => void;
+  onLogin: (token: string) => void;
 }
 
 export default function LandingPage({ onLogin }: LandingPageProps) {
@@ -73,8 +73,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     { value: "99.9%", label: "Uptime" },
   ];
 
-  const handleLogin = (token: string, rt?: string) => {
-    onLogin(token, rt);
+  const handleLogin = (token: string) => {
+    onLogin(token);
   };
 
   return (
