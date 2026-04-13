@@ -279,4 +279,152 @@ router.post('/:id/collabs', auth, async (req, res) => {
   }
 });
 
+// PUT /api/projects/:id/collaborators/:userId/role - изменить роль
+router.put('/:id/collaborators/:userId/role', auth, async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+    const { role } = req.body;
+
+    if (!['editor', 'viewer'].includes(role)) {
+      return res.status(400).json({ error: 'Некорректная роль' });
+    }
+
+    const project = await Project.findByPk(id);
+    if (!project) {
+      return res.status(404).json({ error: 'Проект не найден' });
+    }
+
+    // Проверяем права текущего пользователя
+    const userCollab = await Collab.findOne({
+      where: { projectId: id, userId: req.user.id },
+    });
+
+    if (project.UserId !== req.user.id && (!userCollab || userCollab.role !== 'owner')) {
+      return res.status(403).json({ error: 'Нет прав для изменения ролей' });
+    }
+
+    const collab = await Collab.findOne({
+      where: { projectId: id, userId },
+    });
+
+    if (!collab) {
+      return res.status(404).json({ error: 'Коллаборатор не найден' });
+    }
+
+    if (collab.role === 'owner') {
+      return res.status(400).json({ error: 'Нельзя изменить роль владельца' });
+    }
+
+    collab.role = role;
+    await collab.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project_${id}`).emit('collab:roleChanged', collab);
+    }
+
+    res.json(collab);
+  } catch (err) {
+    console.error('Ошибка изменения роли:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/projects/:id/collaborators/:userId - удалить коллаборатора
+router.delete('/:id/collaborators/:userId', auth, async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+
+    const project = await Project.findByPk(id);
+    if (!project) {
+      return res.status(404).json({ error: 'Проект не найден' });
+    }
+
+    // Проверяем права текущего пользователя
+    const userCollab = await Collab.findOne({
+      where: { projectId: id, userId: req.user.id },
+    });
+
+    if (project.UserId !== req.user.id && (!userCollab || userCollab.role !== 'owner')) {
+      return res.status(403).json({ error: 'Нет прав для удаления участников' });
+    }
+
+    const collabToDelete = await Collab.findOne({
+      where: { projectId: id, userId },
+    });
+
+    if (!collabToDelete) {
+      return res.status(404).json({ error: 'Коллаборатор не найден' });
+    }
+
+    if (collabToDelete.role === 'owner') {
+      return res.status(400).json({ error: 'Нельзя удалить владельца проекта' });
+    }
+
+    await collabToDelete.destroy();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project_${id}`).emit('collab:removed', { userId });
+    }
+
+    res.json({ message: 'Коллаборатор удалён' });
+  } catch (err) {
+    console.error('Ошибка удаления коллаборатора:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:id/versions/:versionId/restore - восстановить версию
+router.post('/:id/versions/:versionId/restore', auth, async (req, res) => {
+  try {
+    const { id, versionId } = req.params;
+
+    const project = await Project.findByPk(id);
+    if (!project) {
+      return res.status(404).json({ error: 'Проект не найден' });
+    }
+
+    const versionToRestore = await Version.findByPk(versionId);
+    if (!versionToRestore || versionToRestore.projectId !== id) {
+      return res.status(404).json({ error: 'Версия не найдена' });
+    }
+
+    // Создаём новую версию с данными восстанавливаемой
+    const newVersion = await Version.create({
+      projectId: id,
+      parentVersionId: versionId,
+      authorId: req.user.id,
+      message: `Restored from version #${versionId}`,
+      storageManifest: versionToRestore.storageManifest,
+    });
+
+    // Обновляем ветку main
+    const mainBranch = await Branch.findOne({
+      where: { projectId: id, name: 'main' },
+    });
+
+    if (mainBranch) {
+      mainBranch.versionId = newVersion.id;
+      await mainBranch.save();
+    } else {
+      await Branch.create({
+        projectId: id,
+        name: 'main',
+        versionId: newVersion.id,
+      });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project_${id}`).emit('version:restored', { oldVersionId: versionId, newVersion });
+    }
+
+    res.json(newVersion);
+  } catch (err) {
+    console.error('Ошибка восстановления версии:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
