@@ -1103,9 +1103,25 @@ function App() {
   };
 
   const fetchProjects = async () => {
-    const res = await fetch("http://localhost:4000/api/projects");
-    const data = await res.json();
-    setProjects(data);
+    try {
+      const res = await fetch("http://localhost:4000/api/projects", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+        throw new Error(`Ошибка загрузки проектов: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      setProjects(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setProjects([]);
+    }
   };
 
   const fetchProjectMedia = async (id: number) => {
