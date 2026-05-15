@@ -61,3 +61,38 @@ export interface Session {
   durationSeconds: number;
   Project?: Project;
 }
+
+export interface Asset {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  thumbnailUrl?: string;
+  previewUrls?: string[];
+  fileUrl: string;
+  fileType: 'image' | 'video' | 'audio' | '3d' | 'font' | 'other';
+  tags: string[];
+  downloadsCount?: number;
+  likesCount?: number;
+  isFree: boolean;
+  UserId: number;
+  User?: User;
+  ProjectId?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface GalleryItem {
+  id: number;
+  title: string;
+  description: string;
+  coverImage: string;
+  images: string[];
+  likesCount?: number;
+  viewsCount?: number;
+  UserId: number;
+  User?: User;
+  ProjectId?: number;
+  createdAt?: string;
+}

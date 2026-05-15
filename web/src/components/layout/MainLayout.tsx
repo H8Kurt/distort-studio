@@ -1,5 +1,5 @@
 import React from 'react';
-import { SparklesIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/solid";
+import { SparklesIcon, ArrowLeftOnRectangleIcon, ShoppingCartIcon, PhotoIcon } from "@heroicons/react/24/solid";
 import Avatar from '../ui/Avatar';
 import ThemeSwitcher from './ThemeSwitcher';
 import type { User } from '../../types/index.js';
@@ -31,9 +31,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, logout }
               </div>
 
               {/* Navigation */}
-              <nav className="hidden md:flex items-center gap-2 ml-8">
+              <nav className="hidden lg:flex items-center gap-2 ml-8">
                 <a href="/" className="btn btn-sm btn-secondary rounded-lg">Проекты</a>
                 <a href="/sessions" className="btn btn-sm btn-secondary rounded-lg">Сессии</a>
+                <a href="/marketplace" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
+                  <ShoppingCartIcon className="w-4 h-4" />
+                  Магазин
+                </a>
+                <a href="/gallery" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
+                  <PhotoIcon className="w-4 h-4" />
+                  Галерея
+                </a>
               </nav>
             </div>
 
