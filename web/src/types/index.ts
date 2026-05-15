@@ -96,3 +96,50 @@ export interface GalleryItem {
   ProjectId?: number;
   createdAt?: string;
 }
+
+export interface Friend {
+  id: number;
+  username: string;
+  avatarUrl?: string;
+  status: 'online' | 'offline' | 'busy';
+  lastSeen?: string;
+  mutualProjects?: number;
+}
+
+export interface Message {
+  id: number;
+  senderId: number;
+  receiverId: number;
+  content: string;
+  timestamp: string;
+  isRead: boolean;
+  type: 'text' | 'file' | 'image';
+  fileUrl?: string;
+}
+
+export interface ChatRoom {
+  id: number;
+  participants: User[];
+  lastMessage?: Message;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+export interface DashboardStats {
+  totalProjects: number;
+  totalAssets: number;
+  totalLikes: number;
+  totalViews: number;
+  totalDownloads: number;
+  friendsCount: number;
+  onlineFriends: number;
+  recentActivity: ActivityItem[];
+}
+
+export interface ActivityItem {
+  id: number;
+  type: 'project_created' | 'asset_uploaded' | 'asset_published' | 'friend_added' | 'message_received';
+  description: string;
+  timestamp: string;
+  icon: string;
+}

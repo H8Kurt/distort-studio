@@ -10,8 +10,8 @@ import GalleryCard from '../components/ui/GalleryCard';
 import type { GalleryItem, User } from '../types';
 
 interface ProjectsGalleryProps {
-  token: string;
-  currentUser: User | null;
+  token?: string;
+  currentUser?: User | null;
 }
 
 // Демо данные для галереи
@@ -106,7 +106,7 @@ const DEMO_GALLERY: GalleryItem[] = [
   }
 ];
 
-const ProjectsGallery: React.FC<ProjectsGalleryProps> = ({ token, currentUser }) => {
+const ProjectsGallery: React.FC<ProjectsGalleryProps> = () => {
   const [galleryItems] = useState<GalleryItem[]>(DEMO_GALLERY);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);

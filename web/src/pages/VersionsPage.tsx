@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderIcon, PlusIcon, PencilIcon } from "@heroicons/react/24/solid";
+import { FolderIcon, PlusIcon } from "@heroicons/react/24/solid";
 import VersionsPanel from '../VersionsPanel';
 import type { Project, Version } from '../types';
 
