@@ -1,202 +1,108 @@
 @import "tailwindcss";
 
 /* ============================
-   === СИСТЕМА ТЕМ С РАСШИРЕННЫМИ НАСТРОЙКАМИ
+   === PREMIUM DESIGN SYSTEM v3.0
+   === Профессиональная дизайн-система для Distort Studio
    ============================ */
 
-/* Тема по умолчанию - Cyber Dark */
+/* === CORE VARIABLES - Premium Dark (Default) === */
 :root {
-  --theme-name: 'cyber-dark';
+  /* Palette - глубокие премиальные цвета */
+  --bg-primary: #030712;
+  --bg-secondary: #111827;
+  --bg-card: #1f2937;
+  --bg-elevated: #374151;
+  --bg-hover: #1f2937;
   
-  /* Основные цвета фона */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-card: #1a1a25;
-  --bg-hover: #252535;
-  
-  /* Акцентные цвета */
-  --accent-primary: #8b5cf6;
+  /* Accent - профессиональный фиолетовый */
+  --accent-primary: #7c3aed;
   --accent-secondary: #a78bfa;
-  --accent-glow: rgba(139, 92, 246, 0.3);
-  --accent-gradient: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  --accent-tertiary: #c4b5fd;
+  --accent-glow: rgba(124, 58, 237, 0.4);
+  --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
   
-  /* Текст */
-  --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  /* Text - оптимизированная иерархия */
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+  --text-muted: #6b7280;
   
-  /* Статусы */
+  /* Status */
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --info: #3b82f6;
   
-  /* Границы */
-  --border-color: #27273a;
-  --border-glow: rgba(139, 92, 246, 0.2);
+  /* Borders */
+  --border-color: #374151;
+  --border-light: #4b5563;
 }
 
-/* Светлая тема - Clean Light */
+/* === LIGHT THEME === */
 [data-theme='light'] {
-  --theme-name: 'clean-light';
-  
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
   --bg-card: #ffffff;
-  --bg-hover: #f1f5f9;
-  
+  --bg-elevated: #f3f4f6;
+  --bg-hover: #f3f4f6;
   --accent-primary: #6366f1;
   --accent-secondary: #818cf8;
-  --accent-glow: rgba(99, 102, 241, 0.2);
-  --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
-  
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  
-  --border-color: #e2e8f0;
-  --border-glow: rgba(99, 102, 241, 0.15);
+  --accent-tertiary: #a5b4fc;
+  --accent-glow: rgba(99, 102, 241, 0.25);
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-muted: #9ca3af;
+  --border-color: #e5e7eb;
+  --border-light: #f3f4f6;
 }
 
-/* Тёмная тема - Midnight Blue */
+/* === MIDNIGHT THEME === */
 [data-theme='midnight'] {
-  --theme-name: 'midnight-blue';
-  
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
   --bg-card: #1e293b;
+  --bg-elevated: #334155;
   --bg-hover: #334155;
-  
   --accent-primary: #3b82f6;
   --accent-secondary: #60a5fa;
-  --accent-glow: rgba(59, 130, 246, 0.3);
-  --accent-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
-  
-  --text-primary: #f1f5f9;
+  --accent-tertiary: #93c5fd;
+  --accent-glow: rgba(59, 130, 246, 0.35);
+  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
   --text-muted: #64748b;
-  
   --border-color: #334155;
-  --border-glow: rgba(59, 130, 246, 0.2);
+  --border-light: #475569;
 }
 
-/* Тёплая тема - Sunset Orange */
-[data-theme='sunset'] {
-  --theme-name: 'sunset-orange';
-  
-  --bg-primary: #1a1a1f;
-  --bg-secondary: #25252e;
-  --bg-card: #2a2a35;
-  --bg-hover: #353540;
-  
-  --accent-primary: #f97316;
-  --accent-secondary: #fb923c;
-  --accent-glow: rgba(249, 115, 22, 0.3);
-  --accent-gradient: linear-gradient(135deg, #f97316, #ea580c);
-  
-  --text-primary: #fef3c7;
-  --text-secondary: #fde68a;
-  --text-muted: #d97706;
-  
-  --border-color: #404050;
-  --border-glow: rgba(249, 115, 22, 0.2);
-}
-
-/* Природная тема - Forest Green */
-[data-theme='forest'] {
-  --theme-name: 'forest-green';
-  
-  --bg-primary: #0c1a12;
-  --bg-secondary: #14291f;
-  --bg-card: #1a3326;
-  --bg-hover: #204030;
-  
-  --accent-primary: #10b981;
-  --accent-secondary: #34d399;
-  --accent-glow: rgba(16, 185, 129, 0.3);
-  --accent-gradient: linear-gradient(135deg, #10b981, #059669);
-  
-  --text-primary: #ecfdf5;
-  --text-secondary: #a7f3d0;
-  --text-muted: #6ee7b7;
-  
-  --border-color: #2d5f45;
-  --border-glow: rgba(16, 185, 129, 0.2);
-}
-
-/* Розовая тема - Neon Pink */
-[data-theme='neon'] {
-  --theme-name: 'neon-pink';
-  
-  --bg-primary: #0f0a15;
-  --bg-secondary: #1a0f25;
-  --bg-card: #251535;
-  --bg-hover: #352045;
-  
-  --accent-primary: #ec4899;
-  --accent-secondary: #f472b6;
-  --accent-glow: rgba(236, 72, 153, 0.4);
-  --accent-gradient: linear-gradient(135deg, #ec4899, #db2777);
-  
-  --text-primary: #fce7f3;
-  --text-secondary: #fbcfe8;
-  --text-muted: #f9a8d4;
-  
-  --border-color: #503060;
-  --border-glow: rgba(236, 72, 153, 0.3);
-}
-
-/* === Базовые настройки === */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* === BASE STYLES === */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 html {
   font-size: 16px;
   scroll-behavior: smooth;
-  overflow-x: hidden;
-  width: 100%;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100vw;
 }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
+#root { width: 100%; min-height: 100vh; }
 
-/* === Скроллбар === */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--accent-primary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-secondary); }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--accent-primary);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-secondary);
-}
-
-/* === Типографика === */
+/* === TYPOGRAPHY === */
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   line-height: 1.2;
@@ -208,9 +114,7 @@ h2 { font-size: 2rem; }
 h3 { font-size: 1.5rem; }
 h4 { font-size: 1.25rem; }
 
-p {
-  color: var(--text-secondary);
-}
+p { color: var(--text-secondary); }
 
 a {
   color: var(--accent-secondary);
@@ -218,191 +122,17 @@ a {
   transition: color 0.2s ease;
 }
 
-a:hover {
-  color: var(--accent-primary);
+a:hover { color: var(--accent-primary); }
+
+/* === UTILITY CLASSES === */
+.text-gradient {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* === Анимированный градиентный фон === */
-.gradient-bg {
-  background: var(--bg-primary);
-  background-image: 
-    radial-gradient(at 40% 20%, var(--accent-glow) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-  min-height: 100vh;
-  width: 100%;
-  overflow-x: hidden;
-  position: relative;
-}
-
-.gradient-bg::before {
-  content: '';
-  position: fixed;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.03), transparent 50%);
-  animation: bgFloat 30s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 0;
-}
-
-@keyframes bgFloat {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(2%, 2%) rotate(1deg); }
-  50% { transform: translate(-1%, 1%) rotate(-1deg); }
-  75% { transform: translate(1%, -2%) rotate(0.5deg); }
-}
-
-/* === Параллакс частицы === */
-.particles-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.particle {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  background: var(--accent-primary);
-  border-radius: 50%;
-  opacity: 0.3;
-  animation: float 15s infinite;
-}
-
-.particle:nth-child(1) { left: 10%; animation-delay: 0s; }
-.particle:nth-child(2) { left: 20%; animation-delay: 2s; }
-.particle:nth-child(3) { left: 30%; animation-delay: 4s; }
-.particle:nth-child(4) { left: 40%; animation-delay: 1s; }
-.particle:nth-child(5) { left: 50%; animation-delay: 3s; }
-.particle:nth-child(6) { left: 60%; animation-delay: 5s; }
-.particle:nth-child(7) { left: 70%; animation-delay: 2.5s; }
-.particle:nth-child(8) { left: 80%; animation-delay: 4.5s; }
-.particle:nth-child(9) { left: 90%; animation-delay: 1.5s; }
-.particle:nth-child(10) { left: 95%; animation-delay: 3.5s; }
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(100vh) scale(0);
-    opacity: 0;
-  }
-  10% {
-    opacity: 0.3;
-  }
-  90% {
-    opacity: 0.3;
-  }
-  100% {
-    transform: translateY(-100vh) scale(1);
-    opacity: 0;
-  }
-}
-
-/* === Glassmorphism эффект === */
-.glass {
-  background: rgba(26, 26, 37, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
-}
-
-.glass-strong {
-  background: rgba(26, 26, 37, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border-color);
-}
-
-/* === Карточки === */
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
-.card:hover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(139, 92, 246, 0.1);
-  transform: translateY(-2px);
-}
-
-.card:hover::before {
-  opacity: 1;
-}
-
-.bg-card {
-  background: var(--bg-card);
-}
-
-.bg-bg-secondary {
-  background: var(--bg-secondary);
-}
-
-.bg-bg-hover {
-  background: var(--bg-hover);
-}
-
-.border-border-color {
-  border-color: var(--border-color);
-}
-
-.text-text-primary {
-  color: var(--text-primary);
-}
-
-.text-text-secondary {
-  color: var(--text-secondary);
-}
-
-.text-text-muted {
-  color: var(--text-muted);
-}
-
-.text-accent-primary {
-  color: var(--accent-primary);
-}
-
-.text-accent-secondary {
-  color: var(--accent-secondary);
-}
-
-.text-danger {
-  color: var(--danger);
-}
-
-.ring-accent-primary {
-  --tw-ring-color: var(--accent-primary);
-}
-
-.shadow-accent-glow {
-  box-shadow: 0 0 30px var(--accent-glow);
-}
-
-/* === Кнопки === */
+/* === BUTTONS - Premium Design === */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -415,69 +145,30 @@ a:hover {
   border: none;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-transform: none;
-  white-space: nowrap;
   position: relative;
   overflow: hidden;
-}
-
-.btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.btn:hover::before {
-  left: 100%;
 }
 
 .btn-primary {
   background: var(--accent-gradient);
   color: white;
-  box-shadow: 0 4px 20px var(--accent-glow);
-  position: relative;
-}
-
-.btn-primary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 2px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 8px 30px var(--accent-glow), 0 0 40px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5);
   transform: translateY(-2px);
-}
-
-.btn-primary:hover::after {
-  opacity: 1;
 }
 
 .btn-secondary {
   background: var(--bg-hover);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  backdrop-filter: blur(8px);
 }
 
 .btn-secondary:hover {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
   border-color: var(--accent-primary);
-  box-shadow: 0 0 20px var(--accent-glow);
   transform: translateY(-1px);
 }
 
@@ -485,32 +176,19 @@ a:hover {
   background: rgba(239, 68, 68, 0.1);
   color: var(--danger);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  backdrop-filter: blur(8px);
 }
 
 .btn-danger:hover {
   background: var(--danger);
   color: white;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
 }
 
-.btn-icon {
-  padding: 0.625rem;
-  border-radius: 10px;
-}
+.btn-sm { padding: 0.5rem 1rem; font-size: 0.8125rem; }
+.btn-lg { padding: 1rem 2rem; font-size: 1rem; }
+.btn-icon { padding: 0.625rem; border-radius: 10px; }
 
-.btn-sm {
-  padding: 0.5rem 1rem;
-  font-size: 0.8125rem;
-}
-
-.btn-lg {
-  padding: 1rem 2rem;
-  font-size: 1rem;
-}
-
-/* === Поля ввода === */
+/* === INPUTS === */
 .input {
   width: 100%;
   padding: 0.875rem 1.25rem;
@@ -519,181 +197,47 @@ a:hover {
   border-radius: 12px;
   color: var(--text-primary);
   font-size: 0.875rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  transition: all 0.3s ease;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px var(--accent-glow), 0 0 20px rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
   background: var(--bg-hover);
-  transform: translateY(-1px);
 }
 
-.input::placeholder {
-  color: var(--text-muted);
-}
+.input::placeholder { color: var(--text-muted); }
 
-.input-group {
-  position: relative;
-}
-
-.input-group .input {
-  padding-left: 2.75rem;
-}
-
-.input-group .input-icon {
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  pointer-events: none;
-  transition: color 0.3s ease;
-}
-
-.input-group:focus-within .input-icon {
-  color: var(--accent-primary);
-}
-
-/* === Анимации === */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(30px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-30px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
-}
-
-@keyframes glow {
-  0%, 100% { box-shadow: 0 0 5px var(--accent-glow); }
-  50% { box-shadow: 0 0 25px var(--accent-glow), 0 0 40px rgba(139, 92, 246, 0.3); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
-}
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-fade-in-down {
-  animation: fadeInDown 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-scale-in {
-  animation: scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-slide-in-right {
-  animation: slideInRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-slide-in-left {
-  animation: slideInLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.animate-glow {
-  animation: glow 2s ease-in-out infinite;
-}
-
-.animate-shimmer {
-  animation: shimmer 2s linear infinite;
-  background: linear-gradient(90deg, var(--bg-card) 0%, var(--bg-hover) 50%, var(--bg-card) 100%);
-  background-size: 1000px 100%;
-}
-
-.animate-bounce {
-  animation: bounce 1s ease-in-out infinite;
-}
-
-/* Задержки анимаций */
-.animation-delay-100 { animation-delay: 100ms; }
-.animation-delay-200 { animation-delay: 200ms; }
-.animation-delay-300 { animation-delay: 300ms; }
-.animation-delay-400 { animation-delay: 400ms; }
-.animation-delay-500 { animation-delay: 500ms; }
-.animation-delay-700 { animation-delay: 700ms; }
-.animation-delay-1000 { animation-delay: 1000ms; }
-
-/* === Утилиты === */
-.text-gradient {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.border-gradient {
-  position: relative;
+/* === CARDS - Premium Design === */
+.card {
   background: var(--bg-card);
-  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.border-gradient::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 12px;
-  padding: 1px;
-  background: var(--accent-gradient);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+.card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 40px rgba(124, 58, 237, 0.15);
+  transform: translateY(-2px);
 }
 
-/* === Разделители === */
-.divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border-color), transparent);
-  margin: 1.5rem 0;
+/* === GLASSMORPHISM === */
+.glass {
+  background: rgba(31, 41, 55, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
 }
 
-/* === Бейджи === */
+.glass-strong {
+  background: rgba(31, 41, 55, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+}
+
+/* === BADGES === */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -705,9 +249,9 @@ a:hover {
 }
 
 .badge-primary {
-  background: rgba(139, 92, 246, 0.1);
+  background: rgba(124, 58, 237, 0.1);
   color: var(--accent-secondary);
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  border: 1px solid rgba(124, 58, 237, 0.3);
 }
 
 .badge-success {
@@ -716,185 +260,47 @@ a:hover {
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.badge-warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--warning);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+/* === ANIMATIONS === */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* === Тултипы === */
-.tooltip {
-  position: relative;
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.tooltip::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-5px);
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.75rem;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.2s ease;
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-.tooltip:hover::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(-8px);
-}
+.animate-fade-in { animation: fadeIn 0.5s ease forwards; }
+.animate-fade-in-up { animation: fadeInUp 0.6s ease forwards; }
+.animate-scale-in { animation: scaleIn 0.4s ease forwards; }
 
-/* === Прогресс бар === */
+/* === PROGRESS BAR === */
 .progress-bar {
   width: 100%;
   height: 6px;
   background: var(--bg-secondary);
   border-radius: 3px;
   overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .progress-bar-fill {
   height: 100%;
   background: var(--accent-gradient);
   border-radius: 3px;
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 10px var(--accent-glow);
-  position: relative;
+  transition: width 0.3s ease;
 }
 
-.progress-bar-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: shimmer 2s infinite;
-}
-
-/* Skeleton loader */
-.skeleton {
-  background: linear-gradient(90deg, var(--bg-card) 0%, var(--bg-hover) 50%, var(--bg-card) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 8px;
-}
-
-/* === Line clamp utility === */
-.line-clamp-1 {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* === Scroll reveal animations === */
-.scroll-reveal {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.scroll-reveal.active {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* === Hover lift effect === */
-.hover-lift {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
-}
-
-/* === Адаптивность === */
-@media (max-width: 768px) {
-  html {
-    font-size: 14px;
-  }
-  
-  h1 { font-size: 2rem; }
-  h2 { font-size: 1.5rem; }
-  h3 { font-size: 1.25rem; }
-  
-  .gradient-bg {
-    background-position: center;
-  }
-}
-
-/* === Темизация скролла для Firefox === */
-html {
-  scrollbar-width: thin;
-  scrollbar-color: var(--accent-primary) var(--bg-secondary);
-}
-
-/* === Предотвращение горизонтального скролла === */
-body, html, #root {
-  overflow-x: hidden;
-  max-width: 100%;
-}
-
-/* === Контейнеры === */
-.container {
-  width: 100%;
-  max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 1rem;
-  padding-right: 1rem;
-}
-
-@media (min-width: 640px) {
-  .container {
-    max-width: 640px;
-  }
-}
-
-@media (min-width: 768px) {
-  .container {
-    max-width: 768px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .container {
-    max-width: 1024px;
-  }
-}
-
-@media (min-width: 1280px) {
-  .container {
-    max-width: 1280px;
-  }
-}
-
-@media (min-width: 1536px) {
-  .container {
-    max-width: 1536px;
-  }
+/* === BACKGROUND === */
+.gradient-bg {
+  background: var(--bg-primary);
+  background-image: 
+    radial-gradient(at 40% 20%, rgba(124, 58, 237, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+  min-height: 100vh;
 }

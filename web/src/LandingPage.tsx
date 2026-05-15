@@ -78,45 +78,51 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   return (
     <div className="min-h-screen w-full gradient-bg flex flex-col items-center overflow-x-hidden">
 
-      {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-50 w-full flex justify-center glass-strong border-b border-gray-800/50">
-        <div className="w-full max-w-[1800px] px-6 h-16 flex items-center justify-between">
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-              <SparklesIcon className="w-6 h-6 text-white" />
+      {/* NAV - Premium Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 w-full glass-strong border-b border-border-color backdrop-blur-xl">
+        <div className="w-full max-w-[1400px] mx-auto px-6 h-20 flex items-center justify-between">
+          
+          {/* Logo */}
+          <div className="flex items-center gap-4 group cursor-pointer">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25 group-hover:shadow-violet-500/40 transition-all duration-300 group-hover:scale-105">
+              <SparklesIcon className="w-7 h-7 text-white" />
             </div>
-            <span className="text-xl font-bold text-gradient">
-              Distort Studio
-            </span>
+            <div>
+              <span className="text-2xl font-bold text-gradient tracking-tight">
+                Distort Studio
+              </span>
+              <p className="text-xs text-text-muted -mt-1">Платформа для творцов</p>
+            </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-gray-300 hover:text-white">
+          {/* Desktop Menu */}
+          <div className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-text-secondary hover:text-text-primary transition-colors font-medium">
               Возможности
             </a>
-            <a href="#for-whom" className="text-gray-300 hover:text-white">
+            <a href="#for-whom" className="text-text-secondary hover:text-text-primary transition-colors font-medium">
               Для кого
             </a>
-
+            <div className="h-6 w-px bg-border-color" />
             <button
               onClick={() => setShowRegister(false)}
-              className="btn btn-secondary"
+              className="text-text-secondary hover:text-text-primary transition-colors font-medium"
             >
               Войти
             </button>
-
             <button
               onClick={() => setShowRegister(true)}
-              className="btn btn-primary"
+              className="btn btn-primary px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-violet-500/25"
             >
               Начать бесплатно
+              <ArrowRightIcon className="w-5 h-5 ml-1" />
             </button>
           </div>
 
+          {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-gray-300"
+            className="md:hidden p-2 text-text-secondary hover:text-text-primary transition-colors"
           >
             {mobileMenuOpen ? (
               <XMarkIcon className="w-6 h-6" />
@@ -129,154 +135,195 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
       {/* MOBILE MENU */}
       {mobileMenuOpen && (
-        <div className="fixed top-16 left-0 right-0 z-50 glass-strong border-b border-gray-800/50 md:hidden">
-          <div className="px-6 py-4 flex flex-col gap-3">
-            <a href="#features">Возможности</a>
-            <a href="#for-whom">Для кого</a>
-
+        <div className="fixed top-20 left-0 right-0 z-50 glass-strong border-b border-border-color md:hidden animate-fade-in">
+          <div className="px-6 py-6 flex flex-col gap-4">
+            <a href="#features" className="text-text-secondary hover:text-text-primary font-medium py-2">
+              Возможности
+            </a>
+            <a href="#for-whom" className="text-text-secondary hover:text-text-primary font-medium py-2">
+              Для кого
+            </a>
+            <div className="h-px bg-border-color my-2" />
             <button
               onClick={() => setShowRegister(false)}
-              className="btn btn-secondary"
+              className="btn btn-secondary w-full justify-center"
             >
               Войти
             </button>
-
             <button
               onClick={() => setShowRegister(true)}
-              className="btn btn-primary"
+              className="btn btn-primary w-full justify-center"
             >
-              Начать
+              Начать бесплатно
             </button>
           </div>
         </div>
       )}
 
-      {/* MAIN */}
-      <main className="w-full max-w-[1800px] px-6 pt-24">
+      {/* MAIN CONTENT */}
+      <main className="w-full max-w-[1400px] px-6 pt-32 pb-20">
 
-        {/* HERO */}
-        <section className="grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
+        {/* HERO SECTION - Premium Design */}
+        <section className="grid lg:grid-cols-2 gap-16 items-center min-h-[75vh]">
 
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-sm">
+          {/* Left Column - Content */}
+          <div className="space-y-8 animate-fade-in-up">
+            
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 text-sm font-medium backdrop-blur-sm">
               <SparklesIcon className="w-4 h-4" />
               GitHub для творцов
             </div>
 
-            <h1 className="text-5xl font-bold text-white leading-tight">
-              Платформа для
-              <br />
-              <span className="text-gradient">цифрового творчества</span>
-            </h1>
+            {/* Headline */}
+            <div>
+              <h1 className="text-5xl lg:text-6xl font-bold text-white leading-tight mb-4">
+                Платформа для
+                <br />
+                <span className="text-gradient">цифрового творчества</span>
+              </h1>
+              <p className="text-lg text-text-secondary max-w-xl leading-relaxed">
+                Управляйте проектами, коллаборациями и версиями в одном месте. 
+                Профессиональные инструменты для современных создателей.
+              </p>
+            </div>
 
-            <p className="text-gray-400 text-lg max-w-lg">
-              Управляйте проектами, коллаборациями и версиями в одном месте.
-            </p>
-
-            <div className="flex gap-4">
+            {/* CTA Buttons */}
+            <div className="flex flex-wrap gap-4">
               <button
                 onClick={() => setShowRegister(true)}
-                className="btn btn-primary"
+                className="btn btn-primary px-8 py-3.5 rounded-xl font-semibold text-base shadow-xl shadow-violet-500/25 hover:shadow-violet-500/40"
               >
-                Начать
+                Начать бесплатно
                 <ArrowRightIcon className="w-5 h-5" />
               </button>
 
-              <button className="btn btn-secondary">
-                Демо
+              <button className="btn btn-secondary px-8 py-3.5 rounded-xl font-semibold text-base border-border-color">
+                Смотреть демо
               </button>
+            </div>
+
+            {/* Trust indicators */}
+            <div className="pt-8 flex items-center gap-6 text-sm text-text-muted">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span>Бесплатно для старта</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <span>Без кредитной карты</span>
+              </div>
             </div>
           </div>
 
-          {/* FORM */}
-          <div className="card">
-            {!showRegister ? (
-              <>
-                <h3 className="text-xl text-white mb-4">Вход</h3>
-                <LoginForm onLogin={handleLogin} />
-                <p className="text-gray-400 mt-4 text-sm">
-                  Нет аккаунта?{" "}
-                  <button
-                    onClick={() => setShowRegister(true)}
-                    className="text-purple-400"
-                  >
-                    регистрация
-                  </button>
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 className="text-xl text-white mb-4">Регистрация</h3>
-                <RegisterForm />
-                <p className="text-gray-400 mt-4 text-sm">
-                  Уже есть аккаунт?{" "}
-                  <button
-                    onClick={() => setShowRegister(false)}
-                    className="text-purple-400"
-                  >
-                    вход
-                  </button>
-                </p>
-              </>
-            )}
+          {/* Right Column - Auth Form */}
+          <div className="animate-scale-in">
+            <div className="card p-8 bg-card/50 backdrop-blur-xl border-border-color shadow-2xl">
+              {!showRegister ? (
+                <>
+                  <div className="mb-6">
+                    <h3 className="text-2xl font-bold text-white mb-2">Вход в аккаунт</h3>
+                    <p className="text-text-secondary">Добро пожаловать обратно!</p>
+                  </div>
+                  <LoginForm onLogin={handleLogin} />
+                  <p className="text-text-secondary mt-6 text-center">
+                    Нет аккаунта?{" "}
+                    <button
+                      onClick={() => setShowRegister(true)}
+                      className="text-accent-secondary font-semibold hover:text-accent-primary transition-colors"
+                    >
+                      Зарегистрироваться
+                    </button>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <h3 className="text-2xl font-bold text-white mb-2">Создать аккаунт</h3>
+                    <p className="text-text-secondary">Присоединяйтесь к сообществу творцов</p>
+                  </div>
+                  <RegisterForm />
+                  <p className="text-text-secondary mt-6 text-center">
+                    Уже есть аккаунт?{" "}
+                    <button
+                      onClick={() => setShowRegister(false)}
+                      className="text-accent-secondary font-semibold hover:text-accent-primary transition-colors"
+                    >
+                      Войти
+                    </button>
+                  </p>
+                </>
+              )}
+            </div>
           </div>
 
         </section>
 
-        {/* STATS */}
-        <section className="py-16 border-y border-gray-800/50">
+        {/* STATS SECTION */}
+        <section className="py-16 border-y border-border-color my-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {stats.map((s, i) => (
-              <div key={i}>
-                <div className="text-4xl font-bold text-gradient">
+              <div key={i} className="group">
+                <div className="text-4xl lg:text-5xl font-bold text-gradient mb-2 group-hover:scale-110 transition-transform">
                   {s.value}
                 </div>
-                <div className="text-gray-400">{s.label}</div>
+                <div className="text-text-secondary font-medium">{s.label}</div>
               </div>
             ))}
           </div>
         </section>
 
-        {/* FEATURES */}
+        {/* FEATURES SECTION */}
         <section id="features" className="py-20">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-white">
+          <div className="text-center mb-16">
+            <span className="text-accent-secondary font-semibold text-sm uppercase tracking-wider">
               Возможности
+            </span>
+            <h2 className="text-4xl lg:text-5xl font-bold text-white mt-3 mb-4">
+              Всё для вашей работы
             </h2>
+            <p className="text-text-secondary text-lg max-w-2xl mx-auto">
+              Профессиональные инструменты в единой платформе
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((f, i) => (
               <div
                 key={i}
-                className="card cursor-pointer"
+                className="card group cursor-pointer hover:shadow-2xl hover:shadow-violet-500/10"
               >
                 <div
-                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4`}
+                  className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}
                 >
-                  <f.icon className="w-6 h-6 text-white" />
+                  <f.icon className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-white font-semibold">{f.title}</h3>
-                <p className="text-gray-400 text-sm">{f.description}</p>
+                <h3 className="text-white font-semibold text-lg mb-2">{f.title}</h3>
+                <p className="text-text-secondary text-sm leading-relaxed">{f.description}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* FOR WHOM */}
+        {/* FOR WHOM SECTION */}
         <section id="for-whom" className="py-20">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-white">
+          <div className="text-center mb-16">
+            <span className="text-accent-secondary font-semibold text-sm uppercase tracking-wider">
               Для кого
+            </span>
+            <h2 className="text-4xl lg:text-5xl font-bold text-white mt-3 mb-4">
+              Создано для творцов
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {creativeFields.map((c, i) => (
-              <div key={i} className="card">
-                <c.icon className="w-6 h-6 text-purple-400 mb-2" />
-                <h3 className="text-white">{c.name}</h3>
-                <p className="text-gray-400 text-sm">{c.desc}</p>
+              <div key={i} className="card group hover:border-accent-primary/50 transition-all">
+                <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-4 group-hover:bg-violet-500/20 transition-colors">
+                  <c.icon className="w-6 h-6 text-violet-400" />
+                </div>
+                <h3 className="text-white font-semibold mb-1">{c.name}</h3>
+                <p className="text-text-secondary text-sm">{c.desc}</p>
               </div>
             ))}
           </div>
