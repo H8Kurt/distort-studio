@@ -1,5 +1,5 @@
 import React from 'react';
-import { SparklesIcon, ArrowLeftOnRectangleIcon, ShoppingCartIcon, PhotoIcon } from "@heroicons/react/24/solid";
+import { SparklesIcon, ArrowLeftOnRectangleIcon, ShoppingCartIcon, PhotoIcon, ChartBarIcon, UserGroupIcon } from "@heroicons/react/24/solid";
 import Avatar from '../ui/Avatar';
 import ThemeSwitcher from './ThemeSwitcher';
 import type { User } from '../../types/index.js';
@@ -20,7 +20,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, logout }
             
             {/* Logo Section */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 group cursor-pointer">
+              <div className="flex items-center gap-3 group cursor-pointer" onClick={() => window.location.href = '/'}>
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25 group-hover:shadow-violet-500/40 transition-all duration-300">
                   <SparklesIcon className="w-6 h-6 text-white" />
                 </div>
@@ -32,7 +32,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, logout }
 
               {/* Navigation */}
               <nav className="hidden lg:flex items-center gap-2 ml-8">
-                <a href="/" className="btn btn-sm btn-secondary rounded-lg">Проекты</a>
+                <a href="/" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
+                  <ChartBarIcon className="w-4 h-4" />
+                  Дашборд
+                </a>
+                <a href="/projects" className="btn btn-sm btn-secondary rounded-lg">Проекты</a>
                 <a href="/sessions" className="btn btn-sm btn-secondary rounded-lg">Сессии</a>
                 <a href="/marketplace" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
                   <ShoppingCartIcon className="w-4 h-4" />
@@ -41,6 +45,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, logout }
                 <a href="/gallery" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
                   <PhotoIcon className="w-4 h-4" />
                   Галерея
+                </a>
+                <a href="/friends" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
+                  <UserGroupIcon className="w-4 h-4" />
+                  Друзья
                 </a>
               </nav>
             </div>

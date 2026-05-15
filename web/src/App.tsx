@@ -10,6 +10,8 @@ import ProfilePage from "./pages/ProfilePage";
 import SessionsPage from "./pages/SessionsPage";
 import AssetsMarketplace from "./pages/AssetsMarketplace";
 import ProjectsGallery from "./pages/ProjectsGallery";
+import DashboardPage from "./pages/DashboardPage";
+import FriendsChat from "./pages/FriendsChat";
 import type { User, Project, UploadFile } from "./types";
 import "./styles/globals.css";
 
@@ -165,6 +167,15 @@ function App() {
           <Route
             path="/"
             element={
+              <DashboardPage
+                token={token}
+                userId={currentUser.id}
+              />
+            }
+          />
+          <Route
+            path="/projects"
+            element={
               <ProjectsPage
                 token={token}
                 currentUser={currentUser}
@@ -232,6 +243,15 @@ function App() {
             path="/gallery"
             element={
               <ProjectsGallery
+                token={token}
+                currentUser={currentUser}
+              />
+            }
+          />
+          <Route
+            path="/friends"
+            element={
+              <FriendsChat
                 token={token}
                 currentUser={currentUser}
               />

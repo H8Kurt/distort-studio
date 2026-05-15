@@ -7,7 +7,7 @@ import type { Project, UploadFile, User } from '../types';
 
 interface ProjectsPageProps {
   token: string | null;
-  currentUser: User | null;
+  currentUser?: User | null;
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   projectId: number | null;
@@ -18,7 +18,6 @@ interface ProjectsPageProps {
 
 const ProjectsPage: React.FC<ProjectsPageProps> = ({
   token,
-  currentUser,
   projects,
   setProjects,
   projectId,
