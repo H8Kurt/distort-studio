@@ -1,4 +1,4 @@
-```gitignore
+```
 # Dependencies
 node_modules/
 
@@ -6,11 +6,7 @@ node_modules/
 dist/
 build/
 .next/
-.nuxt/
-public/dist/
-*.bundle.js
-*.min.js
-*.css.map
+out/
 
 # Logs
 *.log
@@ -18,23 +14,13 @@ public/dist/
 # Environment variables
 .env
 .env.local
-*.env
+*.env.*
 
 # IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
-*.tmp
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
 
 # Python
 __pycache__/
@@ -42,41 +28,45 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
 *.so
-.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/
 .mypy_cache/
-.tox/
+.pytest_cache/
+.hypothesis/
 
 # Node.js
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+node_modules/
+dist/
+build/
+.nyc_output
+coverage/
+.nyc_output/
+.jest/
+jest-coverage/
 
-# Compiled binary files
-*.exe
-*.dll
-*.so
-*.dylib
-*.class
-*.jar
-*.war
-*.zip
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.7z
-*.rar
-*.gz
-*.bz2
-*.xz
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
+# TypeScript
+*.tsbuildinfo
+*.js.map
+*.ts.map
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
 ```

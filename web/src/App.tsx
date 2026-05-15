@@ -8,6 +8,8 @@ import VersionsPage from "./pages/VersionsPage";
 import CollabsPage from "./pages/CollabsPage";
 import ProfilePage from "./pages/ProfilePage";
 import SessionsPage from "./pages/SessionsPage";
+import AssetsMarketplace from "./pages/AssetsMarketplace";
+import ProjectsGallery from "./pages/ProjectsGallery";
 import type { User, Project, UploadFile } from "./types";
 import "./styles/globals.css";
 
@@ -214,6 +216,24 @@ function App() {
               <SessionsPage
                 token={token}
                 projects={projects}
+              />
+            }
+          />
+          <Route
+            path="/marketplace"
+            element={
+              <AssetsMarketplace
+                token={token}
+                currentUser={currentUser}
+              />
+            }
+          />
+          <Route
+            path="/gallery"
+            element={
+              <ProjectsGallery
+                token={token}
+                currentUser={currentUser}
               />
             }
           />
