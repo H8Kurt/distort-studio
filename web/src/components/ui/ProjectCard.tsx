@@ -1,6 +1,6 @@
 import React from 'react';
 import { PencilIcon, TrashIcon, ChevronRightIcon, FolderIcon } from "@heroicons/react/24/solid";
-import type { Project } from '../../types';
+import type { Project } from '../../types/index.js';
 
 interface ProjectCardProps {
   project: Project;

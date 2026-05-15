@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentTextIcon } from "@heroicons/react/24/solid";
-import type { UploadFile } from '../../types';
+import type { UploadFile } from '../../types/index.js';
 
 interface MediaCardProps {
   media: UploadFile;

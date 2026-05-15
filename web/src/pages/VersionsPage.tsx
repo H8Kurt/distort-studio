@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FolderIcon, PlusIcon, PencilIcon } from "@heroicons/react/24/solid";
 import VersionsPanel from '../VersionsPanel';
-import { Project, Version } from '../types';
+import type { Project, Version } from '../types/index.js';
 
 interface VersionsPageProps {
   token: string | null;
