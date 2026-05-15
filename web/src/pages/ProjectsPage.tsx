@@ -3,7 +3,7 @@ import { PhotoIcon, FolderIcon, ClockIcon, UserGroupIcon } from "@heroicons/reac
 import ProjectList from '../components/ui/ProjectList';
 import MediaCard from '../components/ui/MediaCard';
 import UploadForm from '../UploadForm';
-import type { Project, UploadFile, User } from '../types/index.js';
+import type { Project, UploadFile, User } from '../types';
 
 interface ProjectsPageProps {
   token: string | null;
