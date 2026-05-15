@@ -13,48 +13,53 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, logout }) => {
   return (
     <div className="min-h-screen gradient-bg">
-      {/* Верхняя панель */}
-      <header className="sticky top-0 z-50 glass-strong border-b border-gray-800/50">
-        <div className="max-w-[1800px] mx-auto px-6 py-4">
+      {/* Premium Header */}
+      <header className="sticky top-0 z-50 glass-strong border-b border-border-color backdrop-blur-xl">
+        <div className="max-w-[1400px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
+            
+            {/* Logo Section */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <div className="flex items-center gap-3 group cursor-pointer">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25 group-hover:shadow-violet-500/40 transition-all duration-300">
                   <SparklesIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gradient">Distort Studio</h1>
-                  <p className="text-xs text-gray-400">Добро пожаловать, {currentUser?.username}</p>
+                  <h1 className="text-xl font-bold text-gradient tracking-tight">Distort Studio</h1>
+                  <p className="text-xs text-text-muted -mt-0.5">{currentUser?.username}</p>
                 </div>
               </div>
 
-              {/* Навигация в навбаре */}
+              {/* Navigation */}
               <nav className="hidden md:flex items-center gap-2 ml-8">
-                <a href="/" className="btn btn-sm btn-secondary">Проекты</a>
-                <a href="/sessions" className="btn btn-sm btn-secondary">Сессии</a>
+                <a href="/" className="btn btn-sm btn-secondary rounded-lg">Проекты</a>
+                <a href="/sessions" className="btn btn-sm btn-secondary rounded-lg">Сессии</a>
               </nav>
             </div>
 
+            {/* Right Section */}
             <div className="flex items-center gap-3">
               <ThemeSwitcher />
-              <a href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              
+              <a href="/profile" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity px-3 py-2 rounded-xl hover:bg-bg-hover">
                 <Avatar username={currentUser?.username || ""} url={currentUser?.avatarUrl} />
-                <span className="text-sm text-gray-300 hidden lg:inline">{currentUser?.username}</span>
+                <span className="text-sm text-text-secondary font-medium hidden lg:inline">{currentUser?.username}</span>
               </a>
+              
               <button
                 onClick={logout}
-                className="btn btn-danger"
+                className="btn btn-danger btn-sm rounded-lg"
               >
                 <ArrowLeftOnRectangleIcon className="w-4 h-4" />
-                Выйти
+                <span className="hidden sm:inline">Выйти</span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Основной контент */}
-      <main className="max-w-[1800px] mx-auto px-6 py-8">
+      {/* Main Content Area */}
+      <main className="max-w-[1400px] mx-auto px-6 py-8">
         {children}
       </main>
     </div>

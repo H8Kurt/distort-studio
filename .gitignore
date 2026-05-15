@@ -1,53 +1,74 @@
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
+```gitignore
+# Dependencies
+node_modules/
+
+# Build outputs
 dist/
 build/
-target/
+.next/
+.nuxt/
+public/dist/
+*.bundle.js
+*.min.js
+*.css.map
 
-# Dependencies
-.venv/
-venv/
-node_modules/
-.mypy_cache/
-.pytest_cache/
-.gradle/
-
-# Logs and temp files
+# Logs
 *.log
-*.tmp
-*.swp
-*.swo
 
-# Environment
+# Environment variables
 .env
 .env.local
-*.env.*
+*.env
 
-# Editors
+# IDE files
 .vscode/
 .idea/
+*.swp
+*.swo
+*.tmp
 
-# System files
+# OS files
 .DS_Store
 Thumbs.db
 
-# Coverage
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Compressed files
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.mypy_cache/
+.tox/
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Compiled binary files
+*.exe
+*.dll
+*.so
+*.dylib
+*.class
+*.jar
+*.war
 *.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
+*.tar.gz
+*.tar.bz2
+*.tar.xz
 *.7z
 *.rar
+*.gz
+*.bz2
+*.xz
 *.zst
 *.lz4
 *.lzh
@@ -58,7 +79,4 @@ htmlcov/
 *.Z
 *.lz
 *.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+```
