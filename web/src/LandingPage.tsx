@@ -249,7 +249,6 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
             {features.map((f, i) => (
               <div
                 key={i}
-                onMouseEnter={() => setActiveFeature(i)}
                 className="card cursor-pointer"
               >
                 <div
