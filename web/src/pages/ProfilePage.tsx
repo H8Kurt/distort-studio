@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { UserIcon, PencilIcon, SparklesIcon, ClockIcon } from "@heroicons/react/24/solid";
 import Avatar from '../components/ui/Avatar';
 import ProfileEditForm from '../ProfileEditForm';
-import type { User } from '../types';
+import type { User } from '../types/index.js';
 
 interface ProfilePageProps {
   token: string | null;

@@ -3,7 +3,7 @@ import { PhotoIcon, FolderIcon, ClockIcon, UserGroupIcon } from "@heroicons/reac
 import ProjectList from '../components/ui/ProjectList';
 import MediaCard from '../components/ui/MediaCard';
 import UploadForm from '../UploadForm';
-import type { Project, UploadFile, User } from '../types';
+import type { Project, UploadFile, User } from '../types/index.js';
 
 interface ProjectsPageProps {
   token: string | null;
@@ -76,7 +76,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({
       }),
     });
     setProjects((prev: Project[]) => prev.map(p => 
-      p.id === id ? { ...p, title: newTitle, description: newDescription, visibility: newVisibility || p.visibility } : p
+      p.id === id ? { ...p, title: newTitle, description: newDescription, visibility: (newVisibility || p.visibility) as 'PRIVATE' | 'PUBLIC' | 'TEAM' } : p
     ));
   };
 

@@ -5,13 +5,9 @@ node_modules/
 # Build outputs
 dist/
 build/
-target/
-
-# TypeScript/JavaScript
-*.tsbuildinfo
-*.js.map
-*.jsx.map
-*.ts.map
+.next/
+.nuxt/
+public/build/
 
 # Logs
 *.log
@@ -19,25 +15,24 @@ target/
 # Environment variables
 .env
 .env.local
-*.env.*
+.env.*
 
 # IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
-*.tmp
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Coverage
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Python (if present)
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -49,21 +44,21 @@ venv/
 pip-log.txt
 pip-delete-this-directory.txt
 .tox/
-.coverage*
-.nox/
-.pytest_cache/
-.mypy_cache/
+.coverage
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.db
+*.sqlite
+*.sqlite3
 
-# Compiled files
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
+# Temporary files
+*.tmp
+*.temp
+*~
 
-# Archives
+# Compressed files
 *.zip
 *.gz
 *.tar
@@ -82,51 +77,14 @@ pip-delete-this-directory.txt
 *.Z
 *.lz
 *.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 
-# Gradle
-.gradle/
-build/
-
-# Maven
-target/
-
-# Go
-*.exe
-*.dll
-*.so
-*.dylib
-
-# Rust
-target/
-
-# Ruby
-*.gem
-*.rbc
-coverage/
-InstalledFiles
-pkg/
-spec/reports/
-test/tmp/
-test/version_tmp/
-tmp/
-
-# C#
-*.sln
-*.csproj
-*.user
-*.aps
-*.pch
-*.vspscc
-*.vssscc
-*_i.c
-*_p.c
-*.ncb
-*.opendb
-*.opensdf
-*.sdf
-*.cachefile
-*.VC.db
-*.VC.VC.opendb
-[Bb]in
-[Oo]bj
+# Test and coverage
+.mypy_cache/
+.pytest_cache/
+.jest/
+jest/
 ```

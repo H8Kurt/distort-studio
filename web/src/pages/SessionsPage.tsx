@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ClockIcon } from "@heroicons/react/24/solid";
-import { Project, Session } from '../types';
+import type { Project, Session } from '../types/index.js';
 
 interface SessionsPageProps {
   token: string | null;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { FolderIcon, PlusIcon } from "@heroicons/react/24/solid";
 import ProjectCard from '../ui/ProjectCard';
-import type { Project } from '../../types';
+import type { Project } from '../../types/index.js';
 
 interface ProjectListProps {
   projects: Project[];

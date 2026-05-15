@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FolderIcon, UserGroupIcon } from "@heroicons/react/24/solid";
+import { FolderIcon } from "@heroicons/react/24/solid";
 import CollaborationPanel from '../CollaborationPanel';
-import type { Project, Collaborator, User } from '../types';
+import type { Project, Collaborator, User } from '../types/index.js';
 
 interface CollabsPageProps {
   token: string | null;

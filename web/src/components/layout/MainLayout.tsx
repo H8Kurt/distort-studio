@@ -2,7 +2,7 @@ import React from 'react';
 import { SparklesIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/solid";
 import Avatar from '../ui/Avatar';
 import ThemeSwitcher from './ThemeSwitcher';
-import type { User } from '../../types';
+import type { User } from '../../types/index.js';
 
 interface MainLayoutProps {
   children: React.ReactNode;
