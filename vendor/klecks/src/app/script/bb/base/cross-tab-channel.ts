@@ -1,0 +1,139 @@
+import { LocalStorage } from './local-storage';
+import { randomUuid } from './base';
+
+export type TCrossTabChannelListener = (message: any) => void;
+type TLsEntry = {
+    timestamp: number;
+    originId: string; // uuid of current tab
+    message: any;
+};
+
+const originId = randomUuid();
+
+/**
+ * broadcast channel with local storage fallback
+ */
+export class CrossTabChannel {
+    private readonly broadcastChannel: BroadcastChannel | undefined;
+    private readonly broadcastChannelListeners: Set<{
+        nativeListener: (message: MessageEvent) => void; // passes message.data to the external listener
+        listener: TCrossTabChannelListener;
+    }> = new Set();
+
+    // for fallback
+    private lastReadTimestamp: number = Date.now();
+    private readonly maxAgeMs = 1000 * 5;
+    private readonly localStoragePrefix = 'cross-tab-channel--';
+    private readonly localStorageListeners: Set<TCrossTabChannelListener> = new Set();
+
+    private readonly onLocalStorageChange = (e: StorageEvent) => {
+        if (e.key !== this.getLsKey() || e.newValue === null) {
+            // case 1: irrelevant key changed
+            // case 2: null means no new message
+            // -> noop
+            return;
+        }
+        try {
+            const entries = JSON.parse(e.newValue) as TLsEntry[];
+            entries.forEach((entry) => {
+                if (entry.originId === originId || entry.timestamp <= this.lastReadTimestamp) {
+                    // ignore messages from our own tab, or that aren't new
+                    return;
+                }
+                this.lastReadTimestamp = entry.timestamp;
+                this.localStorageListeners.forEach((listener) => listener(entry.message));
+            });
+        } catch (error) {
+            // probably invalid value -> reset
+            LocalStorage.removeItem(this.getLsKey());
+        }
+    };
+
+    private getLsKey(): string {
+        return this.localStoragePrefix + this.name;
+    }
+
+    private getEntries(): TLsEntry[] {
+        let entries: TLsEntry[] = [];
+        try {
+            const raw = LocalStorage.getItem(this.getLsKey());
+            if (raw !== null) {
+                const parsed: unknown = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    entries = parsed as TLsEntry[];
+                }
+            }
+        } catch (error) {
+            // invalid value -> reset
+            LocalStorage.removeItem(this.getLsKey());
+        }
+        return entries;
+    }
+
+    // ----------------------------------- public ----------------------------------
+    constructor(private name: string) {
+        if (typeof BroadcastChannel !== 'undefined') {
+            this.broadcastChannel = new BroadcastChannel(name);
+        }
+    }
+
+    postMessage(message: any): void {
+        if (this.broadcastChannel) {
+            this.broadcastChannel.postMessage(message);
+        } else {
+            const now = Date.now();
+            const entries = this.getEntries().filter((entry) => {
+                // delete old entries
+                return entry.timestamp > now - this.maxAgeMs;
+            });
+            entries.push({
+                timestamp: now,
+                originId,
+                message,
+            });
+            LocalStorage.setItem(this.getLsKey(), JSON.stringify(entries));
+        }
+    }
+
+    subscribe(listener: TCrossTabChannelListener): void {
+        if (this.broadcastChannel) {
+            const nativeListener = (message: MessageEvent) => listener(message.data);
+            this.broadcastChannelListeners.add({
+                nativeListener,
+                listener,
+            });
+            this.broadcastChannel.addEventListener('message', nativeListener);
+        } else {
+            if (this.localStorageListeners.size === 0) {
+                window.addEventListener('storage', this.onLocalStorageChange);
+            }
+            this.localStorageListeners.add(listener);
+        }
+    }
+
+    unsubscribe(listener: TCrossTabChannelListener): void {
+        if (this.broadcastChannel) {
+            const match = [...this.broadcastChannelListeners].find(
+                (item) => item.listener === listener,
+            );
+            if (match) {
+                this.broadcastChannel.removeEventListener('message', match.nativeListener);
+                this.broadcastChannelListeners.delete(match);
+            }
+        } else {
+            this.localStorageListeners.delete(listener);
+            if (this.localStorageListeners.size === 0) {
+                window.removeEventListener('storage', this.onLocalStorageChange);
+            }
+        }
+    }
+
+    close(): void {
+        if (this.broadcastChannel) {
+            this.broadcastChannel.close();
+        } else if (this.localStorageListeners.size > 0) {
+            window.removeEventListener('storage', this.onLocalStorageChange);
+            this.localStorageListeners.clear();
+        }
+    }
+}

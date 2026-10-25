@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Klecks</title>
+    <meta name="color-scheme" content="dark light" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; background: #212121; }
+    </style>
+</head>
+<body>
+<script src="./embed.js"></script>
+<script>
+    /*
+     * Distort Studio — Klecks embed bridge.
+     * Loads the vendored Klecks embed (window.Klecks), exchanges data with the
+     * parent React app over postMessage:
+     *   parent -> iframe: { type: 'klecks:open', kind: 'image'|'psd', data: ArrayBuffer }
+     *                     { type: 'klecks:new', width, height, background }
+     *   iframe -> parent: { type: 'klecks:ready' | 'klecks:opened' | 'klecks:error', ... }
+     *                     { type: 'klecks:submit', ok: true, png: ArrayBuffer, mime }
+     */
+    (function () {
+        var parentWin = window.parent;
+
+        function post(msg, transfer) {
+            parentWin.postMessage(msg, '*', transfer || []);
+        }
+
+        if (typeof Klecks === 'undefined') {
+            post({ type: 'klecks:error', error: 'Klecks embed not loaded' });
+            return;
+        }
+
+        var klecks;
+        try {
+            klecks = new Klecks({
+                onSubmit: function (onSuccess, onError) {
+                    klecks.getPNG().then(function (blob) {
+                        return blob.arrayBuffer();
+                    }).then(function (buffer) {
+                        post({ type: 'klecks:submit', ok: true, png: buffer, mime: 'image/png' }, [buffer]);
+                        onSuccess();
+                    }).catch(function (e) {
+                        post({ type: 'klecks:submit', ok: false, error: String(e) });
+                        onError();
+                    });
+                },
+            });
+        } catch (e) {
+            post({ type: 'klecks:error', error: 'init: ' + e });
+            return;
+        }
+
+        window.addEventListener('message', function (ev) {
+            if (ev.source !== parentWin) return;
+            var data = ev.data || {};
+            try {
+                if (data.type === 'klecks:open' && data.data) {
+                    if (data.kind === 'psd') {
+                        Promise.resolve(klecks.readPSD(data.data)).then(function (project) {
+                            klecks.openProject(project);
+                            post({ type: 'klecks:opened' });
+                        }).catch(function (e) {
+                            post({ type: 'klecks:error', error: 'psd: ' + e });
+                        });
+                        return;
+                    }
+                    var blob = new Blob([data.data], { type: data.mime || 'image/png' });
+                    var url = URL.createObjectURL(blob);
+                    var img = new Image();
+                    img.onload = function () {
+                        try {
+                            klecks.openProject({
+                                width: img.naturalWidth,
+                                height: img.naturalHeight,
+                                layers: [{ name: 'Background', image: img }],
+                            });
+                            post({ type: 'klecks:opened' });
+                        } catch (e) {
+                            post({ type: 'klecks:error', error: String(e) });
+                        }
+                    };
+                    img.onerror = function () {
+                        post({ type: 'klecks:error', error: 'Не удалось декодировать изображение' });
+                    };
+                    img.src = url;
+                } else if (data.type === 'klecks:hello') {
+                    post({ type: 'klecks:ready' });
+                } else if (data.type === 'klecks:getPng') {
+                    klecks.getPNG().then(function (blob) {
+                        return blob.arrayBuffer();
+                    }).then(function (buffer) {
+                        post({ type: 'klecks:png', ok: true, png: buffer }, [buffer]);
+                    }).catch(function (e) {
+                        post({ type: 'klecks:png', ok: false, error: String(e) });
+                    });
+                } else if (data.type === 'klecks:new') {
+                    klecks.openProject({
+                        width: data.width || 1000,
+                        height: data.height || 1000,
+                        layers: [{ name: 'Background', image: { fill: data.background || '#ffffff' } }],
+                    });
+                    post({ type: 'klecks:opened' });
+                }
+            } catch (e) {
+                post({ type: 'klecks:error', error: String(e) });
+            }
+        });
+
+        post({ type: 'klecks:ready' });
+    })();
+</script>
+</body>
+</html>

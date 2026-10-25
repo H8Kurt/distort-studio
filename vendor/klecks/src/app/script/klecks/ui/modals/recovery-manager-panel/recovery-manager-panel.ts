@@ -1,0 +1,245 @@
+import { getIconSvg } from '../../../../icon/icon';
+import { BB } from '../../../../bb/bb';
+import {
+    DEBUG_RETURN_ALL_RECOVERIES,
+    KlRecoveryManager,
+    RECOVERY_MEMORY_LIMIT_BYTES,
+    RECOVERY_THUMB_HEIGHT_PX,
+    TRecoveryMetaData,
+} from '../../../storage/kl-recovery-manager';
+import { timestampToAge } from '../../utils/timestamp-to-age';
+import { showModal } from '../base/show-modal';
+import * as classes from './recovery-manager-panel.module.scss';
+import { LANG } from '../../../../language/language';
+import { asyncThrow, css, Destroyer } from '../../../../bb/base/base';
+import loadingImg from 'url:/src/app/img/ui/loading.gif';
+import { deserializeRecoveryThumbnail } from '../../../storage/kl-recovery-serialization';
+
+export type TRecoveryManagerPanelParams = {
+    klRecoveryManager: KlRecoveryManager;
+};
+
+export class RecoveryManagerPanel {
+    private readonly rootEl: HTMLElement;
+    private readonly recoveryListener = (
+        metas: TRecoveryMetaData[],
+        totalMemoryUsedBytes: number,
+    ) => {
+        this.update(metas, totalMemoryUsedBytes);
+    };
+    private readonly klRecoveryManager: KlRecoveryManager;
+    private readonly destroyer = new Destroyer();
+
+    async update(metas: TRecoveryMetaData[], totalMemoryUsedBytes: number): Promise<void> {
+        this.destroyer.destroy();
+        const elements: HTMLElement[] = [];
+        metas
+            .sort((a, b) => {
+                if (a.timestamp > b.timestamp) {
+                    return -1;
+                }
+                if (a.timestamp < b.timestamp) {
+                    return 1;
+                }
+                return 0;
+            })
+            .forEach((meta) => {
+                const recoverBtn = BB.el({
+                    tagName: 'a',
+                    className: 'kl-button kl-button-link',
+                    content: LANG('tab-recovery-recover'),
+                    props: {
+                        href: '#' + meta.id,
+                        target: '_blank',
+                    },
+                });
+                const deleteBtn = BB.el({
+                    tagName: 'button',
+                    className: 'kl-button kl-button-delete',
+                    content: [
+                        getIconSvg('remove-layer', {
+                            height: 20,
+                        }),
+                        LANG('tab-recovery-delete'),
+                    ],
+                    destroyer: this.destroyer,
+                    onClick: () => {
+                        deleteBtn.blur();
+                        const thumbnail2 = BB.el();
+                        (async () => {
+                            const preview = await deserializeRecoveryThumbnail(meta.thumbnail);
+                            css(preview, {
+                                alignSelf: 'start',
+                                background: 'var(--kl-checkerboard-background)',
+                                maxWidth: '100%',
+                            });
+                            thumbnail2.append(preview);
+                        })();
+                        showModal({
+                            type: 'warning',
+                            message: BB.el({
+                                content: [LANG('tab-recovery-delete-confirmation'), thumbnail2],
+                                css: {
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 10,
+                                },
+                            }),
+                            buttons: [
+                                { id: 'delete', label: LANG('tab-recovery-delete') },
+                                'Cancel',
+                            ],
+                            deleteButton: 'delete',
+                            callback: async (result) => {
+                                if (result === 'Cancel') {
+                                    return;
+                                }
+                                await this.klRecoveryManager.remove(+meta.id);
+                            },
+                        });
+                    },
+                });
+
+                const previewWrapper = BB.el({
+                    tagName: 'a',
+                    className: classes.preview,
+                    title: LANG('tab-recovery-recover'),
+                    css: {
+                        minHeight: RECOVERY_THUMB_HEIGHT_PX,
+                    },
+                    props: {
+                        href: '#' + meta.id,
+                        target: '_blank',
+                    },
+                });
+                (async () => {
+                    const preview = await deserializeRecoveryThumbnail(meta.thumbnail);
+                    previewWrapper.append(preview);
+                })();
+
+                const infoEl = BB.el({
+                    content: [
+                        timestampToAge(meta.timestamp),
+                        ', ' + BB.round(meta.memoryEstimateBytes / 1000000, 1) + ' MB',
+                    ],
+                    css: {
+                        textAlign: 'center',
+                    },
+                });
+
+                elements.push(
+                    BB.el({
+                        content: [previewWrapper, infoEl, recoverBtn, deleteBtn],
+                        css: {
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 5,
+                            maxWidth: '100%',
+                        },
+                    }),
+                );
+            });
+
+        this.rootEl.innerHTML = '';
+        if (DEBUG_RETURN_ALL_RECOVERIES) {
+            this.rootEl.append(
+                BB.el({
+                    content: 'Debug On - SHOWING ALL TABS',
+                    css: { background: 'red' },
+                }),
+            );
+        }
+        this.rootEl.append(
+            BB.el({
+                content: LANG('tab-recovery-explanation'),
+                className: 'kl-toolspace-note',
+            }),
+            BB.el({
+                content:
+                    LANG('tab-recovery-total-quota-label') +
+                    ' ' +
+                    BB.round(totalMemoryUsedBytes / 1000000, 1) +
+                    ' MB / ' +
+                    BB.round(RECOVERY_MEMORY_LIMIT_BYTES / 1000000, 1) +
+                    ' MB',
+                css: {
+                    margin: '10px 0',
+                },
+            }),
+            BB.el({
+                content: [...elements],
+                css: {
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '20px 10px',
+                    justifyContent: 'space-evenly',
+                },
+            }),
+        );
+        if (elements.length === 0) {
+            this.rootEl.append(LANG('tab-recovery-empty'));
+        }
+    }
+
+    // ----------------------------------- public -----------------------------------
+    constructor(p: TRecoveryManagerPanelParams) {
+        this.klRecoveryManager = p.klRecoveryManager;
+        this.rootEl = BB.el({ content: LANG('loading') });
+        this.klRecoveryManager.subscribe(this.recoveryListener);
+
+        const refresh = async () => {
+            try {
+                this.rootEl.innerHTML = '';
+                this.rootEl.append(
+                    BB.el({
+                        tagName: 'img',
+                        props: {
+                            src: loadingImg,
+                            alt: '',
+                        },
+                    }),
+                );
+                await this.klRecoveryManager.update();
+            } catch (error) {
+                asyncThrow(error);
+                const errorText =
+                    error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+                this.rootEl.innerHTML = '';
+                this.rootEl.append(
+                    BB.el({
+                        textContent: LANG('error'),
+                    }),
+                    BB.el({
+                        className: 'info-hint',
+                        textContent: errorText,
+                        css: {
+                            marginTop: 5,
+                            fontFamily: 'monospace',
+                            overflowWrap: 'anywhere',
+                        },
+                    }),
+                    BB.el({
+                        tagName: 'button',
+                        className: 'kl-button',
+                        textContent: LANG('retry'),
+                        destroyer: this.destroyer,
+                        onClick: (e) => {
+                            (e.target as HTMLButtonElement).disabled = true;
+                            refresh();
+                        },
+                    }),
+                );
+            }
+        };
+        setTimeout(refresh);
+    }
+
+    getElement(): HTMLElement {
+        return this.rootEl;
+    }
+
+    destroy(): void {
+        this.klRecoveryManager.unsubscribe(this.recoveryListener);
+        this.destroyer.destroy();
+    }
+}

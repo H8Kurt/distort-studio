@@ -1,4 +1,11 @@
 {
+  "scripts": {
+    "server": "npm --prefix server run dev",
+    "web": "npm --prefix web run dev",
+    "electron": "npm --prefix electron run electron",
+    "build:klecks": "node scripts/build-klecks.mjs",
+    "build:audiomass": "node scripts/build-audiomass.mjs"
+  },
   "devDependencies": {
     "electron": "^40.1.0"
   }

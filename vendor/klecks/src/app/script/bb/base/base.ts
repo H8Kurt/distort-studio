@@ -1,0 +1,403 @@
+import { TCss, TKeyString, TSize2D, TSvg, TVector2D } from '../bb-types';
+
+type TDestroyerCallback = () => void;
+export class Destroyer {
+    private callbacks: TDestroyerCallback[] = [];
+
+    // ------------------------ public -----------------------------
+    constructor() {}
+
+    add(callback: TDestroyerCallback): void {
+        this.callbacks.push(callback);
+    }
+
+    destroy(): void {
+        const callbacks = this.callbacks;
+        this.callbacks = [];
+        callbacks.forEach((callback) => {
+            try {
+                callback();
+            } catch (e) {
+                asyncThrow(e);
+            }
+        });
+    }
+}
+
+export function getSignalAbortError(signal: AbortSignal): unknown {
+    return signal.reason ?? new DOMException('Operation aborted', 'AbortError');
+}
+
+export function insertAfter(referenceNode: Element, newNode: Element): void {
+    if (referenceNode.parentNode) {
+        referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
+    }
+}
+
+export function css(el: HTMLElement | SVGElement, cssObj: TCss): void {
+    const elStyle: any = el.style;
+    Object.entries(cssObj).forEach(([key, value]) => {
+        const property = key as keyof TCss;
+
+        if (typeof value === 'number') {
+            // Let the browser distinguish unitless properties from lengths.
+            elStyle[property] = '';
+            elStyle[property] = value;
+            // e.g. width = 12 will be reset to ''
+            if (elStyle[property] === '') {
+                elStyle[property] = value + 'px';
+            }
+        } else {
+            // undefined would not assign, we must use '' instead for a reset.
+            elStyle[property] = value ?? '';
+        }
+        if (property === 'userSelect') {
+            elStyle.webkitUserSelect = elStyle[property]; // Safari support
+        }
+    });
+}
+
+export function setAttributes(el: Element, attrObj: TKeyString): void {
+    const keyArr = Object.keys(attrObj);
+    let keyStr;
+    for (let i = 0; i < keyArr.length; i++) {
+        keyStr = keyArr[i];
+        el.setAttribute(keyStr, attrObj[keyStr]);
+    }
+}
+
+/**
+ * append a list to DOM element
+ */
+export function append(
+    target: HTMLElement,
+    els: (HTMLElement | SVGElement | string | undefined)[],
+): void {
+    const fragment = document.createDocumentFragment();
+    els.forEach((item) => item && fragment.append(item));
+    target.append(fragment);
+}
+
+/**
+ * a needs to fit into b
+ */
+export function fitInto(
+    aw: number,
+    ah: number,
+    bw: number,
+    bh: number,
+    min?: number,
+    applyFloor?: boolean,
+): TSize2D {
+    let width = aw * bw,
+        height = ah * bw;
+    if (width > bw) {
+        height = (bw / width) * height;
+        width = bw;
+    }
+    if (height > bh) {
+        width = (bh / height) * width;
+        height = bh;
+    }
+    if (min) {
+        width = Math.max(min, width);
+        height = Math.max(min, height);
+    }
+    if (applyFloor) {
+        width = Math.floor(width);
+        height = Math.floor(height);
+    }
+    return { width, height };
+}
+
+/**
+ * center b in a
+ * @param aw
+ * @param ah
+ * @param bw
+ * @param bh
+ */
+export function centerWithin(aw: number, ah: number, bw: number, bh: number): TVector2D {
+    return {
+        x: aw / 2 - bw / 2,
+        y: ah / 2 - bh / 2,
+    };
+}
+
+export function getFilenameDate(): string {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const minutes = (date.getHours() * 60 + date.getMinutes()).toString(36).padStart(3, '0');
+
+    return year + '_' + month + '_' + day + '_' + minutes + '_';
+}
+
+export function gcd(a: number, b: number): number {
+    return b ? gcd(b, a % b) : a;
+}
+
+export function reduce(numerator: number, denominator: number): [number, number] {
+    const g = gcd(numerator, denominator);
+    return [numerator / g, denominator / g];
+}
+
+export function decToFraction(decimalNumber: number): [number, number] {
+    const len = decimalNumber.toString().length - 2;
+    const denominator = 10 ** len;
+    const numerator = decimalNumber * denominator;
+    return reduce(numerator, denominator);
+}
+
+export function isBlob(maybeBlob: unknown): maybeBlob is Blob {
+    return (
+        maybeBlob instanceof Blob || Object.prototype.toString.call(maybeBlob) === '[object Blob]'
+    );
+}
+
+export function dateDayDifference(dateA: string | Date, dateB: string | Date): number {
+    dateA = new Date(dateA);
+    dateB = new Date(dateB);
+    dateA.setHours(0, 0, 0, 0);
+    dateB.setHours(0, 0, 0, 0);
+    return (dateB.getTime() - dateA.getTime()) / (1000 * 60 * 60 * 24);
+}
+
+export function copyObj<T>(obj: T): T {
+    // structuredClone became available around 2022. Let's wait a bit longer for it.
+    return JSON.parse(JSON.stringify(obj));
+}
+
+/**
+ * triggers Web Share API - share feature on mobile devices
+ * Only works if they support file sharing - e.g. Safari can't do this yet
+ * only call if BB.canShareFiles() -> true
+ *
+ * p = {
+ *     canvas: Canvas,
+ *     fileName: string,
+ *     title: string
+ * }
+ *
+ * @param p
+ */
+export function shareCanvas(p: {
+    canvas: HTMLCanvasElement;
+    fileName: string;
+    title: string;
+    callback: () => void;
+}): void {
+    const mimetype = 'image/png';
+    const err = (): void => alert('sharing not supported');
+    p.canvas.toBlob(function (blob) {
+        if (!blob) {
+            err();
+            p.callback();
+            return;
+        }
+        try {
+            const filesArray = [new File([blob], p.fileName, { type: mimetype })];
+            navigator
+                .share({
+                    title: p.title,
+                    files: filesArray,
+                } as any)
+                .then(() => {})
+                .catch(() => {
+                    err();
+                });
+        } catch (e) {
+            err();
+        }
+        p.callback();
+    }, mimetype);
+}
+
+/**
+ * Prevent ipad from zooming in when double tapping. iPadOS 13 bug.
+ * Give it your click event
+ *
+ * Can have GLOBAL EFFECT!
+ *
+ * @param clickEvent
+ * @returns {boolean}
+ */
+export function handleClick(clickEvent: Event): boolean {
+    const target: HTMLElement | null = clickEvent.target as HTMLElement;
+    if (!target) {
+        return false;
+    }
+    let el: HTMLElement | null = target;
+    while (el) {
+        if (['A', 'LABEL', 'INPUT', 'SUMMARY'].includes(el.tagName)) {
+            return true;
+        }
+        el = el.parentElement;
+    }
+    clickEvent.preventDefault();
+    return false;
+}
+
+export function createSvg(p: TSvg): SVGElement {
+    const result = document.createElementNS('http://www.w3.org/2000/svg', p.elementType);
+    Object.entries(p).forEach(([keyStr, item]) => {
+        if (keyStr === 'childrenArr') {
+            (item as TSvg[]).forEach((child) => {
+                result.append(createSvg(child));
+            });
+        } else if (keyStr === 'css') {
+            css(result, item as TCss);
+        } else if (keyStr !== 'elementType') {
+            result.setAttribute(keyStr, item as string);
+        }
+    });
+    return result;
+}
+
+export function throwIfNull<T>(v: T | null): T {
+    if (v === null) {
+        throw new Error('value is null');
+    }
+    return v;
+}
+
+export function throwIfUndefined<T>(v: T | undefined, message = 'value is undefined'): T {
+    if (v === undefined) {
+        throw new Error(message);
+    }
+    return v;
+}
+
+export function nullToUndefined<T>(v: T | null): T | undefined {
+    return v === null ? undefined : v;
+}
+
+export class AttemptError {
+    constructor(public readonly error: unknown) {}
+}
+
+export function attempt<T>(fn: () => Promise<T>): Promise<T | AttemptError>;
+export function attempt<T>(fn: () => T): T | AttemptError;
+export function attempt<T>(fn: () => T | Promise<T>): T | AttemptError | Promise<T | AttemptError> {
+    try {
+        const result = fn();
+
+        if (result instanceof Promise) {
+            return result.catch((error) => new AttemptError(error));
+        }
+
+        return result;
+    } catch (error) {
+        return new AttemptError(error);
+    }
+}
+
+export const asyncThrow = (() => {
+    if (typeof window.reportError === 'function') {
+        return window.reportError;
+    } else {
+        return (error: unknown): void => {
+            setTimeout(() => {
+                throw error;
+            });
+        };
+    }
+})();
+
+const matchMediaDark =
+    typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: dark)')
+        : false;
+
+export function isDark(): boolean {
+    return matchMediaDark && matchMediaDark.matches;
+}
+
+export function addIsDarkListener(func: () => void): void {
+    if (matchMediaDark && typeof matchMediaDark.addEventListener === 'function') {
+        matchMediaDark.addEventListener('change', func);
+    }
+}
+
+export function removeIsDarkListener(func: () => void): void {
+    if (matchMediaDark && typeof matchMediaDark.removeEventListener === 'function') {
+        matchMediaDark.removeEventListener('change', func);
+    }
+}
+
+export function base64ToBlob(base64Str: string): Blob {
+    const parts = base64Str.match(/data:([^;]*)(;base64)?,([0-9A-Za-z+/]+)/) as [
+        string,
+        string,
+        string,
+        string,
+    ];
+    const binStr = atob(parts[3]);
+    const buf = new ArrayBuffer(binStr.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < view.length; i++) {
+        view[i] = binStr.charCodeAt(i);
+    }
+    return new Blob([view], { type: parts[1] });
+}
+
+export function createArray<T>(length: number, fillValue: T): T[] {
+    return new Array(length).fill(fillValue);
+}
+
+export function randomUuid(): string {
+    if (typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // fallback just for dev
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0,
+            v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
+
+export function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// if a promise takes too long
+export function timeoutWrapper<G>(
+    promise: Promise<G>,
+    name: string,
+    timeoutMs: number = 5000,
+): Promise<G> {
+    return new Promise<G>((resolve, reject) => {
+        const timeoutId = setTimeout(
+            () => reject(new Error(`Promise "${name}" timed out.`)),
+            timeoutMs,
+        );
+        promise.then(
+            (value) => {
+                clearTimeout(timeoutId);
+                resolve(value);
+            },
+            (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+            },
+        );
+    });
+}
+
+export async function loadSvg(url: string): Promise<SVGSVGElement> {
+    const response = await fetch(url);
+    const svgText = await response.text();
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgText, 'image/svg+xml');
+    const svg = doc.querySelector('svg');
+
+    if (!svg) {
+        throw new Error('No <svg> found in the file');
+    }
+
+    // Optional: Clone to prevent reusing the same node
+    return svg.cloneNode(true) as SVGSVGElement;
+}

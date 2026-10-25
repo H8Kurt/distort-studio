@@ -1,186 +1,109 @@
-import React, { useState } from 'react';
-import { PhotoIcon, FolderIcon, ClockIcon, UserGroupIcon } from "@heroicons/react/24/solid";
-import ProjectList from '../components/ui/ProjectList';
-import MediaCard from '../components/ui/MediaCard';
-import UploadForm from '../UploadForm';
-import type { Project, UploadFile, User } from '../types';
+import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useNavigate } from "react-router-dom";
+import { PlusIcon, XMarkIcon } from "@heroicons/react/24/solid";
+import ProjectList from "../components/ui/ProjectList";
+import { api } from "../lib/api";
+import type { Project } from "../types";
 
 interface ProjectsPageProps {
-  token: string | null;
-  currentUser?: User | null;
   projects: Project[];
-  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
-  projectId: number | null;
-  setProjectId: React.Dispatch<React.SetStateAction<number | null>>;
-  media: UploadFile[];
-  setMedia: React.Dispatch<React.SetStateAction<UploadFile[]>>;
+  setProjects: Dispatch<SetStateAction<Project[]>>;
+  refreshProjects: () => void;
 }
 
-const ProjectsPage: React.FC<ProjectsPageProps> = ({
-  token,
-  projects,
-  setProjects,
-  projectId,
-  setProjectId,
-  media,
-  setMedia,
-}) => {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [visibilityFilter, setVisibilityFilter] = useState<string>("");
+const EMPTY = { title: "", description: "", visibility: "PRIVATE" as Project["visibility"] };
 
-  const addProject = async (title: string, description: string, visibility: 'PRIVATE' | 'PUBLIC' | 'TEAM') => {
-    if (!token) return;
-    const res = await fetch("http://localhost:4000/api/projects", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ title, description, visibility }),
-    });
-    const created = await res.json();
-    setProjects((prev: Project[]) => [...prev, created]);
+export default function ProjectsPage({ projects, setProjects, refreshProjects }: ProjectsPageProps) {
+  const navigate = useNavigate();
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState(EMPTY);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [shared, setShared] = useState<Project[]>([]);
+
+  const loadShared = () => {
+    api
+      .get<Project[]>("/api/collabs/projects")
+      .then((d) => setShared(Array.isArray(d) ? d : []))
+      .catch(() => undefined);
   };
 
-  const deleteProject = async (id: number) => {
-    if (!token) return;
-    await fetch(`http://localhost:4000/api/projects/${id}`, { 
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (projectId === id) {
-      setProjectId(null);
-      setMedia([]);
+  useEffect(() => {
+    loadShared();
+  }, []);
+
+  const createProject = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      const project = await api.post<Project>("/api/projects", form);
+      setProjects((prev) => [project, ...prev]);
+      setForm(EMPTY);
+      setShowCreate(false);
+      refreshProjects();
+      navigate(`/projects/${project.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка создания");
+    } finally {
+      setSaving(false);
     }
-    setProjects((prev: Project[]) => prev.filter(p => p.id !== id));
-  };
-
-  const editProject = async (
-    id: number,
-    newTitle: string,
-    newDescription: string,
-    newVisibility?: string
-  ) => {
-    if (!token) return;
-    await fetch(`http://localhost:4000/api/projects/${id}`, {
-      method: "PUT",
-      headers: { 
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ 
-        title: newTitle, 
-        description: newDescription,
-        visibility: newVisibility
-      }),
-    });
-    setProjects((prev: Project[]) => prev.map(p => 
-      p.id === id ? { ...p, title: newTitle, description: newDescription, visibility: (newVisibility || p.visibility) as 'PRIVATE' | 'PUBLIC' | 'TEAM' } : p
-    ));
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-      {/* Левая колонка - Проекты */}
-      <div className="lg:col-span-4 xl:col-span-3">
-        <ProjectList
-          projects={projects}
-          projectId={projectId}
-          setProjectId={setProjectId}
-          onEditProject={editProject}
-          onDeleteProject={deleteProject}
-          onCreateProject={addProject}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          visibilityFilter={visibilityFilter}
-          setVisibilityFilter={setVisibilityFilter}
-        />
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <div className="page-header">
+        <div className="page-heading">
+          <span className="page-eyebrow">studio // моя мастерская</span>
+          <h2 className="page-title">Мои проекты</h2>
+          <span className="page-sub">{projects.length} проектов в вашей студии</span>
+        </div>
+        <div className="page-actions">
+          <button className="btn btn-primary" onClick={() => setShowCreate((v) => !v)}>
+            {showCreate ? <XMarkIcon style={{ width: 16, height: 16 }} /> : <PlusIcon style={{ width: 16, height: 16 }} />}
+            {showCreate ? "Отмена" : "Новый проект"}
+          </button>
+        </div>
       </div>
 
-      {/* Правая колонка - Контент проекта */}
-      <div className="lg:col-span-8 xl:col-span-9">
-        {projectId ? (
-          <div className="animate-fade-in">
-            {/* Заголовок проекта с вкладками */}
-            <div className="card mb-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-1">
-                    {projects.find(p => p.id === projectId)?.title || "Проект"}
-                  </h2>
-                  <p className="text-gray-400 text-sm">
-                    {projects.find(p => p.id === projectId)?.description || "Нет описания"}
-                  </p>
-                </div>
-              </div>
+      {error && <div className="badge badge-warning">{error}</div>}
 
-              {/* Вкладки навигации */}
-              <div className="flex gap-2 border-t border-gray-700/50 pt-4">
-                <button
-                  onClick={() => {}}
-                  className={`btn flex-1 btn-primary`}
-                >
-                  <PhotoIcon className="w-4 h-4" />
-                  Медиа
-                </button>
-                <a href={`/versions`} className="btn btn-secondary flex-1">
-                  <FolderIcon className="w-4 h-4" />
-                  Версии
-                </a>
-                <a href={`/collabs`} className="btn btn-secondary flex-1">
-                  <UserGroupIcon className="w-4 h-4" />
-                  Коллабы
-                </a>
-              </div>
-            </div>
-
-            {/* Контент вкладок - только медиа на главной */}
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                <PhotoIcon className="w-6 h-6 text-purple-400" />
-                Медиа проекта
-              </h3>
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <ClockIcon className="w-4 h-4" />
-                {media.length} файлов
-              </div>
-            </div>
-
-            <div className="card mb-6">
-              <UploadForm
-                projectId={projectId}
-                onUploaded={(mediaItem: UploadFile) => {
-                  setMedia((prev: UploadFile[]) => [mediaItem, ...prev]);
-                }}
-              />
-            </div>
-
-            {media.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {media.map((u, i) => (
-                  <MediaCard key={i} media={u} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 card">
-                <PhotoIcon className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                <p className="text-gray-400 text-lg mb-2">Нет медиафайлов</p>
-                <p className="text-gray-500 text-sm">Загрузите первые файлы в этот проект</p>
-              </div>
-            )}
+      {showCreate && (
+        <form onSubmit={createProject} className="card animate-scale-in" style={{ display: "grid", gap: "0.85rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label>Название</label>
+            <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required placeholder="Например, Night Drive EP" />
           </div>
-        ) : (
-          <div className="h-full flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <FolderIcon className="w-24 h-24 mx-auto mb-4 text-gray-700" />
-              <h3 className="text-2xl font-semibold text-gray-500 mb-2">Выберите проект</h3>
-              <p className="text-gray-600">Выберите проект из списка слева или создайте новый</p>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label>Описание</label>
+            <textarea className="input" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="О чём этот проект?" />
           </div>
-        )}
-      </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label>Доступ</label>
+            <select className="input" value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value as Project["visibility"] })}>
+              <option value="PRIVATE">Приватный</option>
+              <option value="PUBLIC">Публичный</option>
+              <option value="TEAM">Командный</option>
+            </select>
+          </div>
+          <button className="btn btn-primary" disabled={saving} style={{ justifySelf: "start" }}>
+            {saving ? "Создаём…" : "Создать проект"}
+          </button>
+        </form>
+      )}
+
+      <ProjectList projects={projects} onSelect={(id) => navigate(`/projects/${id}`)} />
+
+      {shared.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "0.5rem" }}>
+          <div className="page-heading">
+            <span className="page-eyebrow">collab // совместно</span>
+            <h3 className="page-title" style={{ fontSize: "1.25rem" }}>Совместные проекты</h3>
+            <span className="page-sub">{shared.length} проектов, где вы участник</span>
+          </div>
+          <ProjectList projects={shared} onSelect={(id) => navigate(`/projects/${id}`)} />
+        </div>
+      )}
     </div>
   );
-};
-
-export default ProjectsPage;
+}

@@ -6,8 +6,8 @@ const { v4: uuidv4 } = require('uuid');
  * Usage: logger.info({ userId, action }, 'User logged in')
  */
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  transport: process.env.NODE_ENV === 'production' 
+  level: process.env.NODE_ENV === 'test' ? 'silent' : (process.env.LOG_LEVEL || 'info'),
+  transport: (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test')
     ? undefined 
     : {
         target: 'pino-pretty',

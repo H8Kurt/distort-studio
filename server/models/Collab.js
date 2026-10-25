@@ -14,6 +14,14 @@ const Collab = sequelize.define('Collab', {
     type: DataTypes.STRING,
     defaultValue: 'viewer', // viewer, editor, owner
   },
+  status: {
+    type: DataTypes.ENUM('pending', 'accepted', 'declined'),
+    defaultValue: 'accepted',
+  },
+  invitedById: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 });
 
 module.exports = Collab;

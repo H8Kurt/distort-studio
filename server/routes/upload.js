@@ -11,9 +11,11 @@ const auth = require("../middleware/auth");
 // ============================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dest = file.mimetype.startsWith("image/")
-      ? path.join(__dirname, "../uploads/images")
-      : path.join(__dirname, "../uploads/audio");
+    let folder = "documents";
+    if (file.mimetype.startsWith("image/")) folder = "images";
+    else if (file.mimetype.startsWith("video/")) folder = "videos";
+    else if (file.mimetype.startsWith("audio/")) folder = "audio";
+    const dest = path.join(__dirname, `../uploads/${folder}`);
 
     if (!fs.existsSync(dest)) {
       fs.mkdirSync(dest, { recursive: true });
@@ -31,12 +33,28 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
   fileFilter: (req, file, cb) => {
-    if (
-      file.mimetype.startsWith("image/") ||
-      file.mimetype.startsWith("audio/")
-    ) {
+    const mime = file.mimetype || "";
+    const isMedia =
+      mime.startsWith("image/") ||
+      mime.startsWith("audio/") ||
+      mime.startsWith("video/");
+    const docMimes = [
+      "application/pdf",
+      "application/zip",
+      "application/msword",
+      "application/json",
+      "text/plain",
+      "text/csv",
+      "text/markdown",
+    ];
+    const isDoc =
+      mime.startsWith("text/") ||
+      mime.includes("officedocument") ||
+      mime.includes("opendocument") ||
+      docMimes.includes(mime);
+    if (isMedia || isDoc) {
       cb(null, true);
     } else {
       cb(new Error("Недопустимый тип файла"), false);
@@ -56,7 +74,10 @@ router.post("/file", auth, upload.single("file"), async (req, res) => {
     }
 
     const isImage = file.mimetype.startsWith("image/");
-    const baseUrl = "/uploads/" + (isImage ? "images" : "audio");
+    const isVideo = file.mimetype.startsWith("video/");
+    const isAudio = file.mimetype.startsWith("audio/");
+    const folder = isImage ? "images" : isVideo ? "videos" : isAudio ? "audio" : "documents";
+    const baseUrl = "/uploads/" + folder;
     const url = `${baseUrl}/${file.filename}`;
 
     let thumbUrl = null;
@@ -80,12 +101,22 @@ router.post("/file", auth, upload.single("file"), async (req, res) => {
       originalName: file.originalname,
       url,
       thumbUrl,
-      type: isImage ? "image" : "audio",
+      type: isImage ? "image" : isVideo ? "video" : isAudio ? "audio" : "file",
+      mime: file.mimetype,
+      size: file.size,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Ошибка загрузки файла" });
   }
+});
+
+// Обработка ошибок multer (в т.ч. недопустимый тип файла)
+router.use((err, req, res, next) => {
+  if (err) {
+    return res.status(400).json({ error: err.message || "Ошибка загрузки файла" });
+  }
+  next();
 });
 
 module.exports = router;

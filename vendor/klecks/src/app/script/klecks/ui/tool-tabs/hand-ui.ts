@@ -1,0 +1,237 @@
+import { getIconSvg, getIconUrl } from '../../../icon/icon';
+import { BB } from '../../../bb/bb';
+import { LANG } from '../../../language/language';
+import { Checkbox } from '../components/checkbox';
+import { LocalStorage } from '../../../bb/base/local-storage';
+import { css } from '../../../bb/base/base';
+import { BoxToggle } from '../components/box-toggle';
+
+const angleImg = getIconUrl('angle');
+const rotateImg = getIconUrl('edit-rotate');
+const LS_INERTIA_KEY = 'kl-inertia-scroll';
+
+/**
+ * Ui, when hand tool tab is open.
+ */
+export class HandUi {
+    private readonly rootEl: HTMLElement;
+    private isVisible: boolean = true;
+    private scale: number;
+    private angleDeg: number;
+    private readonly scaleEl: HTMLElement;
+    private readonly angleEl: HTMLElement;
+    private readonly angleIm: HTMLImageElement;
+    private readonly flipToggle: BoxToggle;
+
+    private updateUi(): void {
+        this.scaleEl.innerHTML = Math.round(this.scale * 100) + '%';
+        this.angleEl.innerHTML = Math.round(this.angleDeg) + '°';
+
+        css(this.angleIm, {
+            transform: 'rotate(' + this.angleDeg + 'deg)',
+            boxShadow:
+                this.angleDeg % 90 === 0
+                    ? 'inset 0 0 0 1px rgba(255,255,255, 1), 0 0 0 1px rgba(0, 0, 0, 0.3)'
+                    : '',
+        });
+    }
+
+    // ----------------------------------- public -----------------------------------
+
+    constructor(p: {
+        scale: number; // initial value
+        angleDeg: number; // initial value
+        onReset: () => void;
+        onFit: () => void;
+        onAngleChange: (angleDeg: number, isRelative?: boolean) => void;
+        onChangeIsMirrored: (b: boolean) => void;
+        onChangeUseInertiaScrolling: (b: boolean) => void;
+    }) {
+        this.rootEl = BB.el({
+            css: {
+                margin: '10px 10px 0',
+            },
+        });
+        this.scale = p.scale;
+        this.angleDeg = p.angleDeg;
+
+        const row1 = BB.el({
+            css: {
+                marginBottom: 10,
+                display: 'flex',
+            },
+        });
+        const row2 = BB.el({
+            css: {
+                display: 'flex',
+                marginBottom: 10,
+            },
+        });
+        const row3 = BB.el({
+            css: {
+                display: 'flex',
+            },
+        });
+        this.rootEl.append(row1, row2, row3);
+
+        this.scaleEl = BB.el({
+            css: {
+                width: 65,
+                userSelect: 'none',
+                fontFamily: 'monospace',
+            },
+        });
+        row1.append(this.scaleEl);
+
+        this.angleIm = new Image();
+        this.angleIm.src = angleImg;
+        css(this.angleIm, {
+            verticalAlign: 'bottom',
+            width: 20,
+            height: 20,
+            marginRight: 5,
+            borderRadius: 10,
+            background: 'rgba(0,0,0,0.2)',
+            userSelect: 'none',
+        });
+        row1.append(this.angleIm);
+
+        this.angleEl = BB.el({
+            parent: row1,
+            css: {
+                userSelect: 'none',
+            },
+        });
+
+        this.updateUi();
+
+        const resetButton = BB.el({
+            tagName: 'button',
+            className: 'kl-button',
+            content: LANG('hand-reset'),
+            onClick: p.onReset,
+        });
+        resetButton.tabIndex = -1;
+
+        const fitButton = BB.el({
+            tagName: 'button',
+            className: 'kl-button',
+            content: LANG('hand-fit'),
+            css: {
+                marginLeft: 10,
+            },
+            onClick: p.onFit,
+        });
+        fitButton.tabIndex = -1;
+        row2.append(resetButton, fitButton);
+
+        const leftRotateIcon = new Image();
+        leftRotateIcon.height = 20;
+        leftRotateIcon.src = rotateImg;
+        leftRotateIcon.alt = 'Rotate';
+        css(leftRotateIcon, {
+            transform: 'scale(-1, 1)',
+        });
+        const leftRotateButton = BB.el({
+            tagName: 'button',
+            className: 'kl-button',
+            content: leftRotateIcon,
+            onClick: function () {
+                p.onAngleChange(-15, true);
+            },
+        });
+        leftRotateButton.tabIndex = -1;
+
+        const resetAngleButton = BB.el({
+            tagName: 'button',
+            className: 'kl-button',
+            content: '0°',
+            css: {
+                marginLeft: 5,
+            },
+            onClick: function () {
+                p.onAngleChange(0);
+            },
+        });
+        resetAngleButton.tabIndex = -1;
+
+        const rightRotateButton = BB.el({
+            tagName: 'button',
+            className: 'kl-button',
+            content: '<img height="20" src="' + rotateImg + '" alt="Rotate"/>',
+            css: {
+                marginLeft: 5,
+            },
+            onClick: function () {
+                p.onAngleChange(15, true);
+            },
+        });
+        rightRotateButton.tabIndex = -1;
+
+        this.flipToggle = new BoxToggle({
+            keepOriginalLabel: true,
+            label: BB.el({
+                content: getIconSvg('view-flip', { width: 20, height: 20 }),
+                css: {
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: 30,
+                    height: 30,
+                    opacity: '1',
+                },
+            }),
+            title: LANG('hand-flip') + ' [M]',
+            onChange: p.onChangeIsMirrored,
+        });
+        css(this.flipToggle.getElement(), {
+            marginLeft: 10,
+        });
+
+        row3.append(
+            leftRotateButton,
+            resetAngleButton,
+            rightRotateButton,
+            this.flipToggle.getElement(),
+        );
+
+        const inertiaToggle = new Checkbox({
+            label: LANG('hand-inertia-scrolling'),
+            init: LocalStorage.getItem(LS_INERTIA_KEY) === 'true',
+            callback: (b) => {
+                LocalStorage.setItem(LS_INERTIA_KEY, '' + b);
+                p.onChangeUseInertiaScrolling(b);
+            },
+            name: 'enable-inertia-scrolling',
+        });
+        setTimeout(() => {
+            p.onChangeUseInertiaScrolling(inertiaToggle.getValue());
+        }, 500);
+        css(inertiaToggle.getElement(), {
+            marginTop: 10,
+            display: 'inline-block',
+        });
+        this.rootEl.append(inertiaToggle.getElement());
+    }
+
+    getElement(): HTMLElement {
+        return this.rootEl;
+    }
+
+    setIsVisible(pIsVisible: boolean): void {
+        this.isVisible = pIsVisible;
+        this.rootEl.style.display = this.isVisible ? 'block' : 'none';
+        if (this.isVisible) {
+            this.updateUi();
+        }
+    }
+
+    update(pScale: number, pAngleDeg: number, pIsMirrored: boolean): void {
+        this.scale = pScale;
+        this.angleDeg = pAngleDeg;
+        this.flipToggle.setValue(pIsMirrored);
+        if (this.isVisible) {
+            this.updateUi();
+        }
+    }
+}

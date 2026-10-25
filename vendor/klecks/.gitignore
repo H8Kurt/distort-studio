@@ -1,0 +1,6 @@
+node_modules
+.parcel-cache
+dist
+.idea
+src/app/languages
+src/app/icons

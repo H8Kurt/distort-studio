@@ -1,5 +1,8 @@
 const rateLimit = require('express-rate-limit');
-const { logger } = require('./logger');
+const { logger } = require('../lib/logger');
+
+// В тестах/локально можно отключить лимиты (DISABLE_RATE_LIMIT=true)
+const skip = () => process.env.DISABLE_RATE_LIMIT === 'true';
 
 /**
  * Rate limiter for auth endpoints
@@ -11,6 +14,7 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip,
   keyGenerator: (req) => {
     return req.ip || req.headers['x-forwarded-for'] || 'unknown';
   },
@@ -29,6 +33,7 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip,
 });
 
 /**
@@ -40,6 +45,7 @@ const strictLimiter = rateLimit({
   message: { error: 'Too many attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip,
 });
 
 module.exports = {

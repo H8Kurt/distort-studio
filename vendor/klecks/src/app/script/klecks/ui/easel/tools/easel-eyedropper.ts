@@ -1,0 +1,107 @@
+import { BB } from '../../../../bb/bb';
+import { TVector2D } from '../../../../bb/bb-types';
+import { TPointerEvent } from '../../../../bb/input/event.types';
+import pickerImg from 'url:/src/app/img/ui/cursor-picker.png';
+import { createMatrixFromTransform } from '../../../../bb/transform/create-matrix-from-transform';
+import { applyToPoint, inverse } from 'transformation-matrix';
+import { TEaselInterface, TEaselTool, TEaselToolTrigger } from '../easel.types';
+import { TRgb } from '../../../kl-types';
+
+export type TEaselEyedropperParams = {
+    onPick: (p: TVector2D) => TRgb;
+    onPickEnd: () => void;
+};
+
+export class EaselEyedropper implements TEaselTool {
+    private readonly svgEl: SVGElement;
+    private readonly onPick: TEaselEyedropperParams['onPick'];
+    private readonly onPickEnd: TEaselEyedropperParams['onPickEnd'];
+    private easel: TEaselInterface = {} as TEaselInterface;
+    private isDragging: boolean = false;
+    private readonly previewBorder: SVGElement;
+    private readonly previewColor: SVGElement;
+
+    // ----------------------------------- public -----------------------------------
+    tempTriggers: TEaselToolTrigger[] = ['mouse-right', 'alt'];
+
+    constructor(p: TEaselEyedropperParams) {
+        this.svgEl = BB.createSvg({
+            elementType: 'g',
+        });
+        this.onPick = p.onPick;
+        this.onPickEnd = p.onPickEnd;
+
+        //color picker preview circle
+        this.previewBorder = BB.createSvg({
+            elementType: 'circle',
+            r: '47',
+            stroke: 'black',
+            'stroke-width': '22',
+            fill: 'none',
+        });
+        this.previewColor = BB.createSvg({
+            elementType: 'circle',
+            r: '47',
+            stroke: 'black',
+            'stroke-width': '20',
+            fill: 'none',
+        });
+        this.svgEl.append(this.previewBorder, this.previewColor);
+    }
+
+    getSvgElement(): SVGElement {
+        return this.svgEl;
+    }
+
+    onPointer(e: TPointerEvent): void {
+        this.easel.setCursor("url('" + pickerImg + "') 0 15, crosshair");
+        const transform = this.easel.getTransform();
+        const m = createMatrixFromTransform(transform);
+        const p = applyToPoint(inverse(m), { x: e.relX, y: e.relY });
+
+        let color: TRgb | undefined = undefined;
+        const isDown = ['left', 'right'].includes(e.button!);
+        if (isDown) {
+            this.svgEl.setAttribute('transform', `translate(${e.relX},${e.relY})`);
+            this.svgEl.style.opacity = '1';
+        } else {
+            this.svgEl.style.opacity = '0';
+        }
+
+        if (e.type === 'pointerdown' && isDown) {
+            this.isDragging = true;
+            color = this.onPick(p);
+        }
+        if (e.type === 'pointermove' && isDown) {
+            color = this.onPick(p);
+        }
+        if (e.type === 'pointerup' && e.button === undefined && this.isDragging) {
+            this.isDragging = false;
+            this.onPickEnd();
+        }
+        if (color && isDown) {
+            this.previewColor.setAttribute('stroke', BB.ColorConverter.toRgbStr(color));
+            const borderColor = BB.testIsWhiteBestContrast(color)
+                ? 'rgba(255,255,255,0.5)'
+                : 'rgba(0,0,0,0.5)';
+            this.previewBorder.setAttribute('stroke', borderColor);
+        }
+    }
+
+    setEaselInterface(easelInterface: TEaselInterface): void {
+        this.easel = easelInterface;
+    }
+
+    activate(cursorPos?: TVector2D): void {
+        this.easel.setCursor("url('" + pickerImg + "') 0 15, crosshair");
+        this.isDragging = false;
+        this.svgEl.style.opacity = '0';
+    }
+
+    onPointerLeave(): void {
+        if (this.isDragging) {
+            return;
+        }
+        this.svgEl.style.opacity = '0';
+    }
+}

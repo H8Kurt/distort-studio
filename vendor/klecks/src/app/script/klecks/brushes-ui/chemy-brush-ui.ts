@@ -1,0 +1,354 @@
+import { getIconSvg } from '../../icon/icon';
+import { BB } from '../../bb/bb';
+import { EVENT_RES_MS } from './brushes-consts';
+import { createEraserToggle, createLockAlphaToggle } from '../ui/components/create-brush-toggles';
+import { BRUSHES } from '../brushes/brushes';
+import { KlSlider } from '../ui/components/kl-slider';
+import { TBrushUi } from '../kl-types';
+import { Options } from '../ui/components/options';
+import { BoxToggle } from '../ui/components/box-toggle';
+import { LANG, LANGUAGE_STRINGS } from '../../language/language';
+import { ChemyBrush } from '../brushes/chemy-brush';
+import { css } from '../../bb/base/base';
+
+export const chemyBrushUi = (function () {
+    const brushInterface = {
+        image: getIconSvg('brush-chemy'),
+        tooltip: LANG('brush-chemy'),
+        sizeSlider: {
+            min: 0.25,
+            max: 25,
+            exponent: 2,
+            isDisabled: true,
+            displayScale: 2, // radius displayed as diameter
+            decimals: 'adaptive',
+        },
+        opacitySlider: {
+            min: 1 / 100,
+            max: 1,
+            displayScale: 100,
+        },
+    } as TBrushUi<ChemyBrush>;
+
+    LANGUAGE_STRINGS.subscribe(() => {
+        brushInterface.tooltip = LANG('brush-chemy');
+    });
+
+    brushInterface.Ui = function (p) {
+        const div = document.createElement('div'); // the gui
+        const brush = new BRUSHES.ChemyBrush();
+        brush.setHistory(p.klHistory);
+        p.onSizeChange(brush.getSize());
+
+        let sizeSlider: KlSlider;
+        let opacitySlider: KlSlider;
+
+        function setSize(size: number) {
+            brush.setSize(size);
+        }
+
+        let eraserToggle: BoxToggle;
+
+        function init() {
+            sizeSlider = new KlSlider({
+                label: LANG('brush-size'),
+                width: 250,
+                height: 30,
+                ...brushInterface.sizeSlider,
+                value: brush.getSize(),
+                eventResMs: EVENT_RES_MS,
+                isDisabled: brush.getMode() !== 'stroke',
+                onChange: (val) => {
+                    setSize(val);
+                    p.onSizeChange(val);
+                },
+            });
+            opacitySlider = new KlSlider({
+                label: LANG('opacity'),
+                width: 250,
+                height: 30,
+                ...brushInterface.opacitySlider,
+                value: brush.getOpacity(),
+                eventResMs: EVENT_RES_MS,
+                onChange: (val) => {
+                    brush.setOpacity(val);
+                    p.onOpacityChange(val);
+                },
+            });
+
+            css(opacitySlider.getElement(), {
+                marginTop: 10,
+            });
+
+            eraserToggle = createEraserToggle(brush.getIsEraser(), (b) => {
+                brush.setIsEraser(b);
+            });
+
+            const lockAlphaToggle = createLockAlphaToggle(brush.getLockAlpha(), (b) => {
+                brush.setLockAlpha(b);
+            });
+
+            const toggleRow = BB.el({
+                css: {
+                    display: 'flex',
+                    marginTop: 10,
+                },
+            });
+
+            const iconSize = 35;
+            const padding = 8;
+            const actualIconSize = iconSize - padding * 2;
+            const halfSize = actualIconSize / 2;
+
+            const modeOptions = new Options({
+                optionArr: [
+                    {
+                        id: 'fill',
+                        label: BB.createSvg({
+                            class: 'dark-invert',
+                            elementType: 'svg',
+                            width: iconSize + '',
+                            height: iconSize + '',
+                            childrenArr: [
+                                {
+                                    elementType: 'path',
+                                    fill: '#000',
+                                    css: {
+                                        transformOrigin: '0 0',
+                                        transform: `translate(-0.5px, -0.5px) scale(${actualIconSize}, ${actualIconSize}) translate(0.5px, 0.5px)`,
+                                    },
+                                    d: 'M 0,0 C 1.5,0 -0.5,1 1,1',
+                                },
+                            ],
+                        }),
+                        title: LANG('brush-chemy-fill'),
+                    },
+                    {
+                        id: 'stroke',
+                        label: BB.createSvg({
+                            class: 'dark-invert',
+                            elementType: 'svg',
+                            width: iconSize + '',
+                            height: iconSize + '',
+                            childrenArr: [
+                                {
+                                    elementType: 'path',
+                                    fill: 'none',
+                                    stroke: '#000',
+                                    css: {
+                                        strokeWidth: '0.12px',
+                                        transformOrigin: '0 0',
+                                        transform: `translate(-0.5px, -0.5px) scale(${actualIconSize}, ${actualIconSize}) translate(0.5px, 0.5px)`,
+                                    },
+                                    d: 'M 0,0 C 1.5,0 -0.5,1 1,1',
+                                },
+                            ],
+                        }),
+                        title: LANG('brush-chemy-stroke'),
+                    },
+                ],
+                initId: brush.getMode(),
+                onChange: (id: string): void => {
+                    brush.setMode(id as 'stroke' | 'fill');
+                    brushInterface.sizeSlider.isDisabled = brush.getMode() === 'fill';
+                    sizeSlider.setIsEnabled(!brushInterface.sizeSlider.isDisabled);
+
+                    const brushSize = brush.getSize();
+                    sizeSlider.setValue(brushSize);
+                    p.onSizeChange(brushSize);
+                    p.onConfigChange();
+                },
+            });
+
+            const mirrorXToggle = new BoxToggle({
+                label: BB.createSvg({
+                    class: 'dark-invert',
+                    elementType: 'svg',
+                    width: iconSize + '',
+                    height: iconSize + '',
+                    childrenArr: [
+                        {
+                            elementType: 'path',
+                            fill: 'none',
+                            stroke: '#000',
+                            css: {
+                                strokeWidth: 1,
+                            },
+                            d: `M ${halfSize + padding},${padding} ${halfSize + padding},${actualIconSize + padding}`,
+                        },
+                    ],
+                }),
+                title: LANG('brush-chemy-mirror-x'),
+                init: brush.getXSymmetry(),
+                onChange: (b) => {
+                    brush.setXSymmetry(b);
+                },
+            });
+
+            const mirrorYToggle = new BoxToggle({
+                label: BB.createSvg({
+                    class: 'dark-invert',
+                    elementType: 'svg',
+                    width: iconSize + '',
+                    height: iconSize + '',
+                    childrenArr: [
+                        {
+                            elementType: 'path',
+                            fill: 'none',
+                            stroke: '#000',
+                            css: {
+                                strokeWidth: 1,
+                            },
+                            d: `M ${padding},${halfSize + padding} ${actualIconSize + padding},${halfSize + padding}`,
+                        },
+                    ],
+                }),
+                title: LANG('brush-chemy-mirror-y'),
+                init: brush.getYSymmetry(),
+                onChange: (b) => {
+                    brush.setYSymmetry(b);
+                },
+            });
+
+            const gradientToggle = new BoxToggle({
+                label: BB.createSvg({
+                    class: 'dark-invert',
+                    elementType: 'svg',
+                    width: iconSize + '',
+                    height: iconSize + '',
+                    childrenArr: [
+                        {
+                            elementType: 'defs',
+                            childrenArr: [
+                                {
+                                    elementType: 'linearGradient',
+                                    id: 'gradient',
+                                    x1: '0',
+                                    y1: '0',
+                                    x2: '0',
+                                    y2: '1',
+                                    childrenArr: [
+                                        {
+                                            elementType: 'stop',
+                                            offset: '0%',
+                                            'stop-color': 'rgba(0,0,0,0)',
+                                        },
+                                        {
+                                            elementType: 'stop',
+                                            offset: '100%',
+                                            'stop-color': 'rgba(0,0,0,1)',
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            elementType: 'rect',
+                            fill: "url('#gradient')",
+                            x: '' + padding,
+                            y: '' + padding,
+                            width: '' + actualIconSize,
+                            height: '' + actualIconSize,
+                        },
+                    ],
+                }),
+                title: LANG('brush-chemy-gradient'),
+                init: brush.getGradient(),
+                onChange: (b) => {
+                    brush.setGradient(b);
+                },
+            });
+
+            css(mirrorXToggle.getElement(), {
+                marginLeft: 10,
+            });
+            {
+                const margin = {
+                    marginLeft: 4,
+                };
+                css(mirrorYToggle.getElement(), margin);
+                css(gradientToggle.getElement(), margin);
+            }
+
+            toggleRow.append(
+                modeOptions.getElement(),
+                mirrorXToggle.getElement(),
+                mirrorYToggle.getElement(),
+                gradientToggle.getElement(),
+            );
+
+            div.append(
+                sizeSlider.getElement(),
+                opacitySlider.getElement(),
+                toggleRow,
+                BB.el({
+                    content: [lockAlphaToggle.getElement(), eraserToggle.getElement()],
+                    css: {
+                        display: 'flex',
+                        gap: 4,
+                        marginTop: 10,
+                    },
+                }),
+            );
+        }
+
+        init();
+
+        this.increaseSize = function (f) {
+            if (!brush.getIsDrawing() && brush.getMode() === 'stroke') {
+                sizeSlider.changeSliderValue(f);
+            }
+        };
+        this.decreaseSize = function (f) {
+            if (!brush.getIsDrawing() && brush.getMode() === 'stroke') {
+                sizeSlider.changeSliderValue(-f);
+            }
+        };
+
+        this.getSize = function () {
+            return brush.getSize();
+        };
+        this.setSize = function (size) {
+            setSize(size);
+            sizeSlider.setValue(size);
+        };
+        this.getOpacity = function () {
+            return brush.getOpacity();
+        };
+        this.setOpacity = function (opacity) {
+            brush.setOpacity(opacity);
+            opacitySlider.setValue(opacity);
+        };
+
+        this.setColor = function (c) {
+            brush.setColor(c);
+        };
+        this.setLayer = function (layer) {
+            brush.setContext(layer.context);
+        };
+        this.startLine = function (x, y, p) {
+            brush.startLine(x, y);
+        };
+        this.goLine = function (x, y, p, isCoalesced) {
+            brush.goLine(x, y);
+        };
+        this.endLine = function () {
+            brush.endLine();
+        };
+        this.getBrush = function () {
+            return brush;
+        };
+        this.isDrawing = function () {
+            return brush.getIsDrawing();
+        };
+        this.toggleEraser = () => {
+            eraserToggle.setValue(!eraserToggle.getValue());
+            brush.setIsEraser(eraserToggle.getValue());
+        };
+        this.getElement = function () {
+            return div;
+        };
+    } as TBrushUi<ChemyBrush>['Ui'];
+
+    return brushInterface;
+})();

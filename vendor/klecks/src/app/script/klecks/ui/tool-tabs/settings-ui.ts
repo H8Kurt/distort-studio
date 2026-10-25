@@ -1,0 +1,341 @@
+import { SelectCustom } from '../components/select-custom';
+import { getIconSvg, getIconUrl } from '../../../icon/icon';
+import { BB } from '../../../bb/bb';
+import { LANG, LANGUAGE_STRINGS, LS_LANGUAGE_KEY } from '../../../language/language';
+import { languages } from '../../../../languages/languages';
+import klecksLogoImg from 'url:/src/app/img/klecks-logo.png';
+import { LocalStorage } from '../../../bb/base/local-storage';
+import { THEME, TTheme } from '../../../theme/theme';
+import { addIsDarkListener, css, nullToUndefined } from '../../../bb/base/base';
+import { showLicensesDialog } from '../modals/licenses-dialog/show-licenses-dialog';
+import { c } from '../../../bb/base/c';
+import { SaveReminder } from '../components/save-reminder';
+import { showModal } from '../modals/base/show-modal';
+import { createImage } from '../../../bb/base/ui';
+import { PixelatedZoomToggle } from '../components/pixelated-zoom-toggle';
+
+const bitbofLogoImg = getIconUrl('bitbof-logo');
+const uiSwapImg = getIconUrl('ui-swap-lr');
+export type TSettingsUiParams = {
+    onLeftRight: () => void;
+    saveReminder: SaveReminder | undefined;
+    customAbout?: HTMLElement;
+};
+
+export class SettingsUi {
+    private readonly rootEl: HTMLElement;
+
+    // ----------------------------------- public -----------------------------------
+    constructor({ onLeftRight, saveReminder, customAbout }: TSettingsUiParams) {
+        this.rootEl = BB.el({
+            css: {
+                margin: '10px 10px 0',
+            },
+        });
+
+        // ---- language ----
+        const autoLanguage = LANGUAGE_STRINGS.getAutoLanguage();
+
+        const langWrapper = BB.el({
+            parent: this.rootEl,
+            content: BB.el({
+                content: [getIconSvg('language', { height: 20 }), LANG('settings-language') + ':'],
+                css: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    marginRight: 5,
+                    marginBottom: 2,
+                },
+            }),
+            css: {
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+            },
+        });
+
+        const options: [string, string][] = [
+            ['auto', LANG('auto') + ` → ${autoLanguage.name} (${autoLanguage.code})`] as [
+                string,
+                string,
+            ],
+            ...languages.map((item) => {
+                return [item.code, item.name + ` (${item.code})`] as [string, string];
+            }),
+        ];
+        const languageSelect = new SelectCustom({
+            initValue: nullToUndefined(
+                LocalStorage.getItem(LS_LANGUAGE_KEY)
+                    ? LocalStorage.getItem(LS_LANGUAGE_KEY)
+                    : 'auto',
+            ),
+            optionArr: options,
+            onChange: (val) => {
+                if (val === 'auto') {
+                    LocalStorage.removeItem(LS_LANGUAGE_KEY);
+                } else {
+                    LocalStorage.setItem(LS_LANGUAGE_KEY, val);
+                }
+                languageHint.style.display = 'block';
+            },
+            name: 'language',
+        });
+        css(languageSelect.getElement(), {
+            flexGrow: 1,
+        });
+        const languageHint = BB.el({
+            className: 'kl-toolspace-note',
+            content: LANG('settings-language-reload'),
+            css: {
+                display: 'none',
+                marginTop: 5,
+                flexGrow: 1,
+            },
+        });
+
+        langWrapper.append(languageSelect.getElement(), languageHint);
+
+        // ---- theme ----
+        function themeToLabel(theme: TTheme): string {
+            return theme === 'dark' ? '⬛ ' + LANG('theme-dark') : '⬜ ' + LANG('theme-light');
+        }
+        const themeSelect = new SelectCustom({
+            optionArr: [
+                ['auto', LANG('auto') + ' → ' + themeToLabel(THEME.getMediaQueryTheme())],
+                ['light', themeToLabel('light')],
+                ['dark', themeToLabel('dark')],
+            ],
+            initValue: THEME.getStoredTheme() || 'auto',
+            onChange: (val): void => {
+                THEME.setStoredTheme(val === 'auto' ? undefined : val);
+            },
+            name: 'ui-theme',
+        });
+        css(themeSelect.getElement(), {
+            flexGrow: 1,
+        });
+        addIsDarkListener(() => {
+            themeSelect.updateLabel(
+                'auto',
+                LANG('auto') + ' → ' + themeToLabel(THEME.getMediaQueryTheme()),
+            );
+        });
+        BB.el({
+            parent: this.rootEl,
+            content: [
+                BB.el({
+                    content: LANG('settings-theme') + ':',
+                    css: {
+                        marginRight: 5,
+                        marginBottom: 2,
+                    },
+                }),
+                themeSelect.getElement(),
+            ],
+            css: {
+                marginTop: 15,
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+            },
+        });
+
+        // ---- pixelated zoom ----
+        const pixelatedZoomToggle = new PixelatedZoomToggle();
+        css(pixelatedZoomToggle.getElement(), {
+            marginTop: 15,
+        });
+        this.rootEl.append(pixelatedZoomToggle.getElement());
+
+        // ---- save reminder ----
+        if (saveReminder) {
+            const reminderSelect = new SelectCustom({
+                optionArr: [
+                    ['20min', LANG('x-minutes', { x: '20' })],
+                    ['40min', LANG('x-minutes', { x: '40' })],
+                    ['disabled', '⚠️ ' + LANG('settings-save-reminder-disabled')],
+                ],
+                initValue: saveReminder.getSetting(),
+                onChange: (val) => {
+                    if (val !== 'disabled') {
+                        saveReminder.setSetting(val);
+                        return;
+                    }
+                    showModal({
+                        message: '⚠️' + LANG('settings-save-reminder-confirm-title'),
+                        div: c('', [
+                            c('.info-hint', LANG('settings-save-reminder-confirm-a')),
+                            LANG('settings-save-reminder-confirm-b'),
+                        ]),
+                        buttons: [
+                            {
+                                id: 'disable',
+                                label: LANG('settings-save-reminder-confirm-disable'),
+                            },
+                            'Cancel',
+                        ],
+                        callback: (result) => {
+                            if (result === 'disable') {
+                                saveReminder.setSetting(val);
+                            } else {
+                                reminderSelect.setValue(saveReminder.getSetting());
+                            }
+                        },
+                    });
+                },
+                name: 'save-reminder-interval',
+            });
+            reminderSelect.getElement().style.flexGrow = '1';
+
+            this.rootEl.append(
+                c(',flex,items-center,gap-5,mt-15,flexWrap', [
+                    LANG('settings-save-reminder-label') + ':',
+                    reminderSelect.getElement(),
+                ]),
+            );
+        }
+
+        // ---- flip ui ----
+        BB.el({
+            tagName: 'button',
+            className: 'kl-button',
+            parent: this.rootEl,
+            content: [
+                createImage({
+                    alt: 'icon',
+                    src: uiSwapImg,
+                    width: 18,
+                    height: 20,
+                    css: {
+                        marginRight: 5,
+                    },
+                }),
+                LANG('switch-ui-left-right'),
+            ],
+            onClick: () => onLeftRight(),
+            css: {
+                marginTop: 15,
+            },
+            props: {
+                tabIndex: -1,
+            },
+        });
+
+        // ---- about ----
+        this.rootEl.append(BB.el({ className: 'grid-hr', css: { margin: '10px 0' } }));
+
+        function makeLicenses() {
+            return BB.el({
+                tagName: 'a',
+                content: LANG('licenses'),
+                onClick: () => showLicensesDialog(),
+            });
+        }
+
+        if (customAbout) {
+            this.rootEl.append(customAbout);
+            if (!customAbout.innerHTML) {
+                const minimalAbout = BB.el({
+                    parent: customAbout,
+                    css: {
+                        textAlign: 'center',
+                    },
+                });
+                minimalAbout.append(
+                    BB.el({
+                        content: [
+                            createImage({
+                                alt: 'icon',
+                                height: 20,
+                                src: bitbofLogoImg,
+                                css: {
+                                    verticalAlign: 'middle',
+                                },
+                            }),
+                            ' ',
+                            BB.el({
+                                tagName: 'a',
+                                content: 'bitbof',
+                                props: {
+                                    href: 'https://bitbof.com',
+                                    target: '_blank',
+                                    tabIndex: -1,
+                                },
+                            }),
+                            ' © 2026',
+                            BB.el({ tagName: 'br' }),
+                        ],
+                    }),
+                    makeLicenses(),
+                );
+            }
+        } else {
+            const versionEl = BB.el({
+                parent: this.rootEl,
+                css: {
+                    textAlign: 'center',
+                },
+                content: [
+                    createImage({
+                        alt: 'Klecks',
+                        className: 'dark-invert',
+                        height: 25,
+                        src: klecksLogoImg,
+                    }),
+                    BB.el({ tagName: 'br' }),
+                    createImage({
+                        alt: 'icon',
+                        height: 20,
+                        src: bitbofLogoImg,
+                        css: {
+                            verticalAlign: 'middle',
+                        },
+                    }),
+                    ' ',
+                    BB.el({
+                        tagName: 'a',
+                        content: 'bitbof',
+                        props: {
+                            href: 'https://bitbof.com',
+                            target: '_blank',
+                            tabIndex: -1,
+                        },
+                    }),
+                    ' © 2025',
+                    BB.el({ tagName: 'br' }),
+                ],
+            });
+
+            versionEl.append(
+                makeLicenses(),
+                document.createTextNode(' | '),
+                BB.el({
+                    tagName: 'a',
+                    content: LANG('source-code'),
+                    props: {
+                        href: 'https://klecks.org',
+                        target: '_blank',
+                    },
+                }),
+            );
+        }
+
+        window.addEventListener('storage', (e) => {
+            if (e.key !== LS_LANGUAGE_KEY) {
+                return;
+            }
+            languageSelect.setValue(
+                nullToUndefined(
+                    LocalStorage.getItem(LS_LANGUAGE_KEY)
+                        ? LocalStorage.getItem(LS_LANGUAGE_KEY)
+                        : 'auto',
+                ),
+            );
+        });
+    }
+
+    getElement(): HTMLElement {
+        return this.rootEl;
+    }
+}

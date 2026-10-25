@@ -1,0 +1,881 @@
+import { getIconSvg } from '../../../../icon/icon';
+import { BB } from '../../../../bb/bb';
+import { changeCanvasDimensions } from '../../../../bb/base/change-canvas-dimensions';
+import { SelectCustom } from '../../components/select-custom';
+import { PointSlider } from '../../components/point-slider';
+import { KlCanvas, MAX_LAYERS } from '../../../canvas/kl-canvas';
+import { TMixMode } from '../../../kl-types';
+import { LANG } from '../../../../language/language';
+import { translateBlending } from '../../../canvas/translate-blending';
+import { PointerListener } from '../../../../bb/input/pointer-listener';
+import { TPointerEvent } from '../../../../bb/input/event.types';
+import { renameLayerDialog } from './rename-layer-dialog';
+import { mergeLayerDialog } from './merge-layer-dialog';
+import { css } from '../../../../bb/base/base';
+import { HAS_POINTER_EVENTS } from '../../../../bb/base/browser';
+import { c } from '../../../../bb/base/c';
+import { DropdownMenu } from '../../components/dropdown-menu';
+import { KlHistory } from '../../../history/kl-history';
+import * as classes from './layers-ui.module.scss';
+import { BoxToggle } from '../../components/box-toggle';
+import { FloatingLayerPreview } from '../../components/floating-layer-preview';
+
+const paddingLeft = 25;
+
+type TLayerEl = HTMLElement & {
+    label: HTMLElement;
+    opacityLabel: HTMLElement;
+    thumb: HTMLCanvasElement;
+
+    spot: number;
+    posY: number;
+    layerName: string;
+    opacity: number;
+    pointerListener: PointerListener;
+    opacitySlider: PointSlider;
+    isSelected: boolean;
+};
+
+export type TLayersUiParams = {
+    klCanvas: KlCanvas;
+    onSelect: (layerIndex: number, pushHistory: boolean) => void;
+    parentEl: HTMLElement;
+    floatingLayerPreview: FloatingLayerPreview;
+    applyUncommitted: () => void;
+    klHistory: KlHistory;
+    onUpdateProject: () => void; // triggers update of easel
+    onClearLayer: () => void;
+};
+
+export class LayersUi {
+    // from params
+    private klCanvas: KlCanvas;
+    private readonly onSelect: (layerIndex: number, pushHistory: boolean) => void;
+    private readonly parentEl: HTMLElement;
+    private readonly floatingLayerPreview: FloatingLayerPreview;
+    private readonly applyUncommitted: () => void;
+    private klHistory: KlHistory;
+    private readonly onUpdateProject: () => void;
+    private readonly onClearLayer: () => void;
+
+    private readonly rootEl: HTMLElement;
+    private isVisible: boolean = true;
+    private klCanvasLayerArr: {
+        context: CanvasRenderingContext2D;
+        opacity: number;
+        name: string;
+        mixModeStr: TMixMode;
+        hasClipping: boolean;
+    }[];
+    private readonly layerListEl: HTMLElement;
+    private layerElArr: TLayerEl[];
+    private selectedSpotIndex: number;
+    private readonly removeBtn: HTMLButtonElement;
+    private readonly addBtn: HTMLButtonElement;
+    private readonly duplicateBtn: HTMLButtonElement;
+    private readonly mergeBtn: HTMLButtonElement;
+    private readonly moreDropdown: DropdownMenu<'clear-layer' | 'advanced-merge' | 'merge-all'>;
+    private readonly modeSelect: SelectCustom<TMixMode>;
+    private readonly clippingToggle: BoxToggle;
+    private oldHistoryState: number | undefined;
+    private isManipulating: boolean = false;
+
+    private readonly largeThumbCanvas: HTMLCanvasElement;
+    private lastpos: number = 0;
+
+    private readonly layerHeight: number = 35;
+    private readonly layerSpacing: number = 0;
+
+    private move(oldSpotIndex: number, newSpotIndex: number): void {
+        if (isNaN(oldSpotIndex) || isNaN(newSpotIndex)) {
+            throw 'layers-ui - invalid move';
+        }
+        for (let i = 0; i < this.layerElArr.length; i++) {
+            ((i) => {
+                let posy = this.layerElArr[i].spot;
+                if (this.layerElArr[i].spot === oldSpotIndex) {
+                    posy = newSpotIndex;
+                } else {
+                    if (this.layerElArr[i].spot > oldSpotIndex) {
+                        posy--;
+                    }
+                    if (posy >= newSpotIndex) {
+                        posy++;
+                    }
+                }
+                this.layerElArr[i].spot = posy;
+                this.layerElArr[i].posY =
+                    (this.layerHeight + this.layerSpacing) *
+                    (this.klCanvasLayerArr.length - posy - 1);
+                this.layerElArr[i].style.top = this.layerElArr[i].posY + 'px';
+            })(i);
+        }
+        if (oldSpotIndex === newSpotIndex) {
+            return;
+        }
+        this.applyUncommitted();
+        this.klCanvas.moveLayer(this.selectedSpotIndex, newSpotIndex - oldSpotIndex);
+        this.klCanvasLayerArr = this.klCanvas.getLayers();
+        this.selectedSpotIndex = newSpotIndex;
+        this.mergeBtn.disabled = this.selectedSpotIndex === 0;
+    }
+
+    private posToSpot(p: number): number {
+        let result = parseInt('' + (p / (this.layerHeight + this.layerSpacing) + 0.5));
+        result = Math.min(this.klCanvasLayerArr.length - 1, Math.max(0, result));
+        result = this.klCanvasLayerArr.length - result - 1;
+        return result;
+    }
+
+    /**
+     * update css position of all layers that are not being dragged, while dragging
+     */
+    private updateLayersVerticalPosition(elementIndex: number, newspot: number): void {
+        newspot = Math.min(this.klCanvasLayerArr.length - 1, Math.max(0, newspot));
+        if (newspot === this.lastpos) {
+            return;
+        }
+        for (let i = 0; i < this.layerElArr.length; i++) {
+            if (this.layerElArr[i].spot === elementIndex) {
+                continue;
+            }
+            let posy = this.layerElArr[i].spot;
+            if (this.layerElArr[i].spot > elementIndex) {
+                posy--;
+            }
+            if (posy >= newspot) {
+                posy++;
+            }
+            this.layerElArr[i].posY =
+                (this.layerHeight + this.layerSpacing) * (this.klCanvasLayerArr.length - posy - 1);
+            this.layerElArr[i].style.top = this.layerElArr[i].posY + 'px';
+        }
+        this.lastpos = newspot;
+    }
+
+    private renameLayer(layerSpot: number): void {
+        renameLayerDialog(this.parentEl, this.klCanvas.getLayer(layerSpot).name, (newName) => {
+            if (newName === undefined || newName === this.klCanvas.getLayer(layerSpot).name) {
+                return;
+            }
+            this.klCanvas.renameLayer(layerSpot, newName);
+            //this.createLayerList();
+            this.onSelect(layerSpot, false);
+        });
+    }
+
+    private updateHeight(): void {
+        this.layerListEl.style.height = this.layerElArr.length * 35 + 'px';
+    }
+
+    private createLayerList(force?: boolean): void {
+        if (this.klHistory.getChangeCount() === this.oldHistoryState && !force) {
+            return;
+        }
+        this.isManipulating = false;
+        this.oldHistoryState = this.klHistory.getChangeCount();
+        this.klCanvasLayerArr = this.klCanvas.getLayers();
+
+        const createLayerEntry = (index: number): void => {
+            const klLayer = this.klCanvas.getLayer(index);
+            const layerName = klLayer.name;
+            const opacity = this.klCanvasLayerArr[index].opacity;
+            const isVisible = klLayer.isVisible;
+            const layercanvas = this.klCanvasLayerArr[index].context.canvas;
+            const hasClipping = this.klCanvasLayerArr[index].hasClipping;
+            const clippingOffset = hasClipping ? 15 : 0;
+
+            const layer: TLayerEl = BB.el({
+                className: 'kl-layer',
+            }) as HTMLElement as TLayerEl;
+            this.layerElArr[index] = layer;
+            layer.posY = (this.klCanvasLayerArr.length - 1) * 35 - index * 35;
+            css(layer, {
+                top: layer.posY,
+            });
+            const innerLayer = BB.el();
+            css(innerLayer, {
+                position: 'relative',
+            });
+
+            const container1 = BB.el();
+            css(container1, {
+                width: 270,
+                height: 34,
+            });
+            const container2 = BB.el();
+            layer.append(innerLayer);
+            innerLayer.append(container1, container2);
+
+            layer.spot = index;
+
+            //checkbox - visibility
+            {
+                const checkWrapper = BB.el({
+                    tagName: 'label',
+                    parent: container1,
+                    title: LANG('layers-visibility-toggle'),
+                    css: {
+                        display: 'flex',
+                        width: 25,
+                        height: '100%',
+                        justifyContent: 'right',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                    },
+                });
+                const check = BB.el({
+                    tagName: 'input',
+                    parent: checkWrapper,
+                    props: {
+                        type: 'checkbox',
+                        tabIndex: -1,
+                        name: 'layer-visibility',
+                    },
+                    css: {
+                        display: 'block',
+                        cursor: 'pointer',
+                        margin: 0,
+                        marginRight: 5,
+                    },
+                });
+                check.checked = isVisible;
+                check.onchange = () => {
+                    this.klCanvas.setLayerIsVisible(layer.spot, check.checked);
+                    if (layer.spot === this.selectedSpotIndex) {
+                        this.onSelect(this.selectedSpotIndex, false);
+                    }
+                };
+                // prevent layer getting dragged
+                const preventFunc = (e: PointerEvent | MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                if (HAS_POINTER_EVENTS) {
+                    checkWrapper.onpointerdown = preventFunc;
+                } else {
+                    checkWrapper.onmousedown = preventFunc;
+                }
+            }
+
+            //thumb
+            {
+                const thumbDimensions = BB.fitInto(
+                    layercanvas.width,
+                    layercanvas.height,
+                    30,
+                    30,
+                    1,
+                    true,
+                );
+                layer.thumb = BB.canvas(thumbDimensions.width, thumbDimensions.height);
+
+                const thc = BB.ctx(layer.thumb);
+                thc.save();
+                if (layer.thumb.width > layercanvas.width) {
+                    thc.imageSmoothingEnabled = false;
+                }
+                thc.drawImage(layercanvas, 0, 0, layer.thumb.width, layer.thumb.height);
+                thc.restore();
+                css(layer.thumb, {
+                    position: 'absolute',
+                    left: (32 - layer.thumb.width) / 2 + paddingLeft,
+                    top: (32 - layer.thumb.height) / 2 + 1,
+                    background: 'var(--kl-checkerboard-background)',
+                });
+            }
+
+            //clipping indicator
+            const clippingIcon = hasClipping
+                ? getIconSvg('layer-clipping', {
+                      position: 'absolute',
+                      left: paddingLeft + 32,
+                      top: 9,
+                      width: 16,
+                      height: 16,
+                      pointerEvents: 'none',
+                  })
+                : undefined;
+            clippingIcon?.classList.add(classes.clippingIndicator);
+
+            //layerlabel
+            {
+                layer.label = BB.el({
+                    className: 'kl-layer__label',
+                });
+                layer.layerName = layerName;
+                layer.label.append(layer.layerName);
+
+                css(layer.label, {
+                    position: 'absolute',
+                    left: 1 + 32 + 5 + paddingLeft + clippingOffset,
+                    top: 1,
+                    fontSize: 13,
+                    width: 165 - clippingOffset,
+                    height: 20,
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                });
+
+                layer.label.ondblclick = () => {
+                    this.applyUncommitted();
+                    this.renameLayer(layer.spot);
+                };
+            }
+            //layer label opacity
+            {
+                layer.opacityLabel = BB.el({
+                    className: 'kl-layer__opacity-label',
+                });
+                layer.opacity = opacity;
+                layer.opacityLabel.append(parseInt('' + layer.opacity * 100) + '%');
+
+                css(layer.opacityLabel, {
+                    position: 'absolute',
+                    left: 250 - 1 - 5 - 50 - 5 + paddingLeft,
+                    top: 1,
+                    fontSize: 13,
+                    textAlign: 'right',
+                    width: 50,
+                    transition: 'color 0.2s ease-in-out',
+                    textDecoration: isVisible ? undefined : 'line-through',
+                });
+            }
+
+            let oldOpacity: number;
+            const opacitySlider = new PointSlider({
+                init: layer.opacity,
+                width: 200 - clippingOffset,
+                pointSize: 14,
+                callback: (sliderValue, isFirst, isLast) => {
+                    if (isFirst) {
+                        this.isManipulating = true;
+                        oldOpacity = this.klCanvas.getLayer(layer.spot).opacity;
+                        return;
+                    }
+                    if (isLast) {
+                        this.isManipulating = false;
+                        if (oldOpacity !== sliderValue) {
+                            this.klCanvas.setOpacity(layer.spot, sliderValue);
+                        }
+                        return;
+                    }
+                    layer.opacityLabel.innerHTML = Math.round(sliderValue * 100) + '%';
+                    this.klHistory.pause(true);
+                    try {
+                        this.klCanvas.setOpacity(layer.spot, sliderValue);
+                    } finally {
+                        this.klHistory.pause(false);
+                    }
+                    this.onUpdateProject();
+                },
+                getDoIgnore: () => this.isManipulating,
+            });
+            css(opacitySlider.getElement(), {
+                position: 'absolute',
+                left: 39 + paddingLeft + clippingOffset,
+                top: 17,
+            });
+            layer.opacitySlider = opacitySlider;
+
+            //larger layer preview - hover
+            layer.thumb.onpointerover = (e) => {
+                if (e.buttons !== 0 && (!e.pointerType || e.pointerType !== 'touch')) {
+                    //shouldn't show while dragging
+                    return;
+                }
+
+                const thumbDimensions = BB.fitInto(
+                    layercanvas.width,
+                    layercanvas.height,
+                    250,
+                    250,
+                    1,
+                    true,
+                );
+
+                changeCanvasDimensions(
+                    this.largeThumbCanvas,
+                    thumbDimensions.width,
+                    thumbDimensions.height,
+                    { ensureCleared: true },
+                );
+                const ctx = BB.ctx(this.largeThumbCanvas);
+                ctx.save();
+                if (this.largeThumbCanvas.width > layercanvas.width) {
+                    ctx.imageSmoothingEnabled = false;
+                }
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(
+                    layercanvas,
+                    0,
+                    0,
+                    this.largeThumbCanvas.width,
+                    this.largeThumbCanvas.height,
+                );
+                ctx.restore();
+                this.floatingLayerPreview.show(this.largeThumbCanvas, e.clientY);
+            };
+            // Won't fire when element is removed from DOM. To fix when rewriting layers-ui.
+            layer.thumb.onpointerout = () => {
+                this.floatingLayerPreview.hide();
+            };
+
+            container1.append(layer.thumb);
+            if (clippingIcon) {
+                container1.append(clippingIcon);
+            }
+            container1.append(layer.label, layer.opacityLabel, opacitySlider.getElement());
+            let dragstart = false;
+            let freshSelection = false;
+
+            //events for moving layers up and down
+            let isDragging = false;
+            const dragEventHandler = (event: TPointerEvent) => {
+                if (
+                    event.type === 'pointerdown' &&
+                    event.button === 'left' &&
+                    !this.isManipulating
+                ) {
+                    css(layer, {
+                        transition: 'box-shadow 0.3s ease-in-out',
+                        zIndex: 1,
+                    });
+                    this.lastpos = layer.spot;
+                    freshSelection = false;
+                    if (!layer.isSelected) {
+                        freshSelection = true;
+                        this.activateLayer(layer.spot);
+                    }
+                    dragstart = true;
+                    isDragging = true;
+                    this.isManipulating = true;
+                } else if (event.type === 'pointermove' && event.button === 'left' && isDragging) {
+                    if (dragstart) {
+                        dragstart = false;
+                        css(layer, {
+                            boxShadow: '1px 3px 5px rgba(0,0,0,0.4)',
+                        });
+                    }
+                    layer.posY += event.dY;
+                    const corrected = Math.max(
+                        0,
+                        Math.min((this.klCanvasLayerArr.length - 1) * 35, layer.posY),
+                    );
+                    layer.style.top = corrected + 'px';
+                    this.updateLayersVerticalPosition(layer.spot, this.posToSpot(layer.posY));
+                }
+                if (event.type === 'pointerup' && isDragging) {
+                    this.isManipulating = false;
+                    css(layer, {
+                        transition: 'all 0.1s linear',
+                    });
+                    setTimeout(() => {
+                        css(layer, {
+                            boxShadow: '',
+                        });
+                    }, 20);
+                    layer.posY = Math.max(
+                        0,
+                        Math.min((this.klCanvasLayerArr.length - 1) * 35, layer.posY),
+                    );
+                    layer.style.zIndex = '';
+                    const newSpot = this.posToSpot(layer.posY);
+                    const oldSpot = layer.spot;
+                    this.move(layer.spot, newSpot);
+                    if (oldSpot !== newSpot) {
+                        this.onSelect(this.selectedSpotIndex, false);
+                    }
+                    if (oldSpot === newSpot && freshSelection) {
+                        this.applyUncommitted();
+                        this.onSelect(this.selectedSpotIndex, true);
+                    }
+                    freshSelection = false;
+                }
+            };
+
+            layer.pointerListener = new BB.PointerListener({
+                target: container1,
+                onPointer: dragEventHandler,
+                maxPointers: 1,
+            });
+
+            this.layerListEl.append(layer);
+        };
+        this.layerElArr = [];
+        while (this.layerListEl.firstChild) {
+            const child = this.layerListEl.firstChild as TLayerEl;
+            child.pointerListener.destroy();
+            child.opacitySlider.destroy();
+            child.remove();
+        }
+        for (let i = 0; i < this.klCanvasLayerArr.length; i++) {
+            createLayerEntry(i);
+        }
+        this.activateLayer(this.selectedSpotIndex);
+        this.updateHeight();
+    }
+
+    private updateButtons(): void {
+        const maxReached = this.klCanvasLayerArr.length === MAX_LAYERS;
+        const oneLayer = this.klCanvasLayerArr.length === 1;
+
+        this.addBtn.disabled = maxReached;
+        this.removeBtn.disabled = oneLayer;
+        this.duplicateBtn.disabled = maxReached;
+        this.mergeBtn.disabled = this.selectedSpotIndex === 0;
+        this.moreDropdown.setEnabled('advanced-merge', !oneLayer);
+        this.moreDropdown.setEnabled('merge-all', !oneLayer);
+    }
+
+    private mergeLayer(mixModeStr?: TMixMode): void {
+        const layerIndex = this.klCanvas.mergeLayer(this.selectedSpotIndex, mixModeStr);
+        if (layerIndex === undefined) {
+            return;
+        }
+        this.update(layerIndex);
+        this.onSelect(layerIndex, false);
+    }
+
+    // ----------------------------------- public -----------------------------------
+    constructor(p: TLayersUiParams) {
+        this.klCanvas = p.klCanvas;
+        this.onSelect = p.onSelect;
+        this.parentEl = p.parentEl;
+        this.floatingLayerPreview = p.floatingLayerPreview;
+        this.applyUncommitted = p.applyUncommitted;
+        this.klHistory = p.klHistory;
+        this.onUpdateProject = p.onUpdateProject;
+        this.onClearLayer = p.onClearLayer;
+
+        this.layerElArr = [];
+        this.layerHeight = 35;
+        this.layerSpacing = 0;
+        const width = 270;
+
+        this.largeThumbCanvas = BB.canvas();
+
+        this.klCanvasLayerArr = this.klCanvas.getLayers();
+        this.selectedSpotIndex = this.klCanvasLayerArr.length - 1;
+        this.rootEl = BB.el({
+            css: {
+                marginRight: 10,
+                marginBottom: 0,
+                marginLeft: 10,
+                marginTop: 10,
+                cursor: 'default',
+                position: 'relative',
+                zIndex: 0,
+            },
+        });
+
+        const listDiv = BB.el({
+            css: {
+                width: width,
+                position: 'relative',
+                margin: '0 -10px',
+                zIndex: 0,
+            },
+        });
+
+        this.layerListEl = BB.el({
+            parent: listDiv,
+        });
+
+        this.addBtn = BB.el({ tagName: 'button', className: 'kl-button' });
+        this.duplicateBtn = BB.el({ tagName: 'button', className: 'kl-button' });
+        this.mergeBtn = BB.el({ tagName: 'button', className: 'kl-button' });
+        this.removeBtn = BB.el({ tagName: 'button', className: 'kl-button' });
+        const renameBtn = BB.el({ tagName: 'button', className: 'kl-button' });
+
+        const iconSize = 20;
+        this.clippingToggle = new BoxToggle({
+            keepOriginalLabel: true,
+            label: (() => {
+                const icon = getIconSvg('layer-clipping', {
+                    width: iconSize,
+                    height: iconSize,
+                });
+                icon.classList.add(classes.clippingIcon);
+                return BB.el({
+                    content: icon,
+                    className: classes.clippingIconWrapper,
+                });
+            })(),
+            title: LANG('layers-clipping'),
+            init: this.klCanvasLayerArr[this.selectedSpotIndex].hasClipping,
+            onChange: (hasClipping) => {
+                this.klCanvas.setLayerHasClipping(this.selectedSpotIndex, hasClipping);
+                this.update(this.selectedSpotIndex);
+            },
+        });
+        this.moreDropdown = new DropdownMenu({
+            button: BB.el({
+                content: getIconSvg('chevron-down', { width: '13px' }),
+                css: {
+                    display: 'flex',
+                    justifyContent: 'center',
+                    opacity: '0.9',
+                },
+            }),
+            buttonTitle: LANG('more'),
+            items: [
+                ['clear-layer', LANG('layers-clear'), '⌫'],
+                ['advanced-merge', LANG('layers-merge-advanced'), 'Ctrl + Shift + E'],
+                ['merge-all', LANG('layers-merge-all')],
+            ],
+            onItemClick: (id) => {
+                if (id === 'clear-layer') {
+                    this.onClearLayer();
+                }
+                if (id === 'advanced-merge') {
+                    this.advancedMergeDialog();
+                }
+                if (id === 'merge-all') {
+                    this.applyUncommitted();
+                    const newIndex = this.klCanvas.mergeAll();
+                    if (newIndex === false) {
+                        return;
+                    }
+                    this.update(newIndex);
+                    this.onSelect(newIndex, false);
+                }
+            },
+        });
+
+        this.updateButtons();
+
+        const createButtons = () => {
+            const div = BB.el();
+            const async = () => {
+                this.addBtn.tabIndex = -1;
+                this.duplicateBtn.tabIndex = -1;
+                this.mergeBtn.tabIndex = -1;
+                this.removeBtn.tabIndex = -1;
+                renameBtn.tabIndex = -1;
+
+                this.addBtn.title = LANG('layers-new');
+                this.duplicateBtn.title = LANG('layers-duplicate');
+                this.removeBtn.title = LANG('layers-remove');
+                this.mergeBtn.title = LANG('layers-merge');
+                renameBtn.title = LANG('layers-rename-title');
+
+                this.addBtn.append(
+                    getIconSvg('add-layer', {
+                        height: 20,
+                    }),
+                );
+                this.duplicateBtn.append(
+                    getIconSvg('duplicate-layer', {
+                        height: 20,
+                    }),
+                );
+                this.mergeBtn.append(
+                    getIconSvg('merge-layers', {
+                        height: 20,
+                    }),
+                );
+                this.removeBtn.append(
+                    getIconSvg('remove-layer', {
+                        height: 20,
+                    }),
+                );
+                renameBtn.append(
+                    getIconSvg('rename-layer', {
+                        height: 20,
+                    }),
+                );
+                div.append(
+                    c(',flex,gap-5,mb-10', [
+                        this.addBtn,
+                        this.removeBtn,
+                        this.duplicateBtn,
+                        this.mergeBtn,
+                        renameBtn,
+                        this.clippingToggle.getElement(),
+                        c(',grow-1'),
+                        this.moreDropdown.getElement(),
+                    ]),
+                );
+
+                this.addBtn.onclick = () => {
+                    this.applyUncommitted();
+                    if (this.klCanvas.addLayer(this.selectedSpotIndex) === false) {
+                        return;
+                    }
+                    this.klCanvasLayerArr = this.klCanvas.getLayers();
+
+                    this.selectedSpotIndex = this.selectedSpotIndex + 1;
+                    this.onSelect(this.selectedSpotIndex, false);
+
+                    this.updateButtons();
+                };
+                this.duplicateBtn.onclick = () => {
+                    this.applyUncommitted();
+                    if (this.klCanvas.duplicateLayer(this.selectedSpotIndex) === false) {
+                        return;
+                    }
+                    this.klCanvasLayerArr = this.klCanvas.getLayers();
+
+                    this.selectedSpotIndex++;
+                    this.onSelect(this.selectedSpotIndex, false);
+
+                    this.updateButtons();
+                };
+                this.removeBtn.onclick = () => {
+                    this.applyUncommitted();
+                    if (this.layerElArr.length <= 1) {
+                        return;
+                    }
+
+                    this.klCanvas.removeLayer(this.selectedSpotIndex);
+                    if (this.selectedSpotIndex > 0) {
+                        this.selectedSpotIndex--;
+                    }
+                    this.klCanvasLayerArr = this.klCanvas.getLayers();
+                    this.onSelect(this.selectedSpotIndex, false);
+
+                    this.updateButtons();
+                };
+                this.mergeBtn.onclick = () => {
+                    this.applyUncommitted();
+                    this.mergeLayer();
+                };
+
+                renameBtn.onclick = () => {
+                    this.applyUncommitted();
+                    this.renameLayer(this.selectedSpotIndex);
+                };
+            };
+            setTimeout(async, 1);
+            return div;
+        };
+        this.rootEl.append(createButtons());
+
+        let modeWrapper;
+        {
+            modeWrapper = BB.el({
+                content: LANG('layers-blending') + '&nbsp;',
+                css: {
+                    fontSize: 15,
+                },
+            });
+
+            this.modeSelect = new SelectCustom<TMixMode>({
+                optionArr: [
+                    'source-over',
+                    undefined,
+                    'darken',
+                    'multiply',
+                    'color-burn',
+                    undefined,
+                    'lighten',
+                    'screen',
+                    'color-dodge',
+                    undefined,
+                    'overlay',
+                    'soft-light',
+                    'hard-light',
+                    undefined,
+                    'difference',
+                    'exclusion',
+                    undefined,
+                    'hue',
+                    'saturation',
+                    'color',
+                    'luminosity',
+                ].map((item: any) => {
+                    return item ? [item, translateBlending(item)] : undefined;
+                }),
+                onChange: (val) => {
+                    this.klCanvas.setMixMode(this.selectedSpotIndex, val as TMixMode);
+                    this.update(this.selectedSpotIndex);
+                },
+                css: {
+                    marginBottom: 10,
+                },
+                name: 'layer-blend-mode',
+            });
+
+            modeWrapper.append(this.modeSelect.getElement());
+            this.rootEl.append(modeWrapper);
+        }
+
+        this.rootEl.append(listDiv);
+
+        this.klHistory.addListener(() => {
+            if (this.rootEl.style.display !== 'block') {
+                return;
+            }
+            this.createLayerList();
+        });
+
+        this.createLayerList();
+    }
+
+    // ---- interface ----
+    update(activeLayerSpotIndex?: number): void {
+        this.klCanvasLayerArr = this.klCanvas.getLayers();
+        if (activeLayerSpotIndex || activeLayerSpotIndex === 0) {
+            this.selectedSpotIndex = activeLayerSpotIndex;
+        }
+        this.updateButtons();
+        if (this.isVisible) {
+            this.createLayerList();
+        }
+    }
+
+    getSelected(): number {
+        return this.selectedSpotIndex;
+    }
+
+    activateLayer(spotIndex: number): void {
+        if (spotIndex < 0 || spotIndex > this.layerElArr.length - 1) {
+            throw (
+                'invalid spotIndex ' + spotIndex + ', layerElArr.length ' + this.layerElArr.length
+            );
+        }
+        this.selectedSpotIndex = spotIndex;
+        this.modeSelect.setValue(this.klCanvasLayerArr[this.selectedSpotIndex].mixModeStr);
+        this.clippingToggle.setValue(this.klCanvasLayerArr[this.selectedSpotIndex].hasClipping);
+        for (let i = 0; i < this.layerElArr.length; i++) {
+            const layer = this.layerElArr[i];
+            const isSelected = this.selectedSpotIndex === layer.spot;
+
+            css(layer, {
+                boxShadow: '',
+            });
+            layer.classList.toggle('kl-layer--selected', isSelected);
+            layer.opacitySlider.setActive(isSelected);
+            layer.isSelected = isSelected;
+        }
+        this.mergeBtn.disabled = this.selectedSpotIndex === 0;
+    }
+
+    getElement(): HTMLElement {
+        return this.rootEl;
+    }
+
+    advancedMergeDialog(): void {
+        this.applyUncommitted();
+        if (this.selectedSpotIndex <= 0) {
+            return;
+        }
+        mergeLayerDialog(this.parentEl, {
+            topCanvas: this.klCanvasLayerArr[this.selectedSpotIndex].context.canvas,
+            bottomCanvas: this.klCanvasLayerArr[this.selectedSpotIndex - 1].context.canvas,
+            topOpacity: this.klCanvas.getLayer(this.selectedSpotIndex).opacity,
+            mixModeStr: this.klCanvasLayerArr[this.selectedSpotIndex].mixModeStr,
+            callback: (mode) => this.mergeLayer(mode as TMixMode),
+        });
+    }
+
+    setIsVisible(b: boolean): void {
+        if (b === this.isVisible) {
+            return;
+        }
+        this.isVisible = b;
+        this.rootEl.style.display = b ? 'block' : 'none';
+    }
+}

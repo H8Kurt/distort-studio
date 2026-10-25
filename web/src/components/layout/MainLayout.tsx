@@ -1,84 +1,139 @@
-import React from 'react';
-import { SparklesIcon, ArrowLeftOnRectangleIcon, ShoppingCartIcon, PhotoIcon, ChartBarIcon, UserGroupIcon } from "@heroicons/react/24/solid";
-import Avatar from '../ui/Avatar';
-import ThemeSwitcher from './ThemeSwitcher';
-import type { User } from '../../types/index.js';
+import React, { useEffect, useState } from "react";
+import { NavLink } from "react-router-dom";
+import {
+  HomeIcon,
+  FolderIcon,
+  ShoppingBagIcon,
+  UserCircleIcon,
+  GlobeAmericasIcon,
+  UsersIcon,
+  ChatBubbleLeftRightIcon,
+  MusicalNoteIcon,
+  SignalIcon,
+  TrophyIcon,
+  MegaphoneIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/solid";
+import Atmosphere from "../ui/Atmosphere";
+import AppWatchers from "../AppWatchers";
+import TopNav from "./TopNav";
+import Sidebar from "./Sidebar";
+import CommandPalette from "./CommandPalette";
+import ConfirmProvider from "../ui/ConfirmDialog";
+import EmailVerificationBanner from "./EmailVerificationBanner";
+import PlayerProvider from "../player/PlayerProvider";
+import PlayerDock from "../player/PlayerDock";
+import LiveRoomProvider from "../room/LiveRoomProvider";
+import { getSkin, type Skin } from "../../lib/skin";
+import type { AnnouncementSetting, Project, User } from "../../types";
 
 interface MainLayoutProps {
   children: React.ReactNode;
-  currentUser: User | null;
+  currentUser: User;
+  projects: Project[];
   logout: () => void;
+  announcement?: AnnouncementSetting | null;
+  maintenance?: boolean;
 }
 
-const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, logout }) => {
+const MOBILE_NAV = [
+  { to: "/", label: "Лента", icon: HomeIcon, end: true },
+  { to: "/discover", label: "Обзор", icon: GlobeAmericasIcon },
+  { to: "/projects", label: "Проекты", icon: FolderIcon },
+  { to: "/rooms", label: "Комнаты", icon: SignalIcon },
+  { to: "/challenges", label: "Челленджи", icon: TrophyIcon },
+  { to: "/music", label: "Музыка", icon: MusicalNoteIcon },
+  { to: "/friends", label: "Друзья", icon: UsersIcon },
+  { to: "/chat", label: "Чат", icon: ChatBubbleLeftRightIcon },
+  { to: "/marketplace", label: "Магазин", icon: ShoppingBagIcon },
+  { to: "/profile", label: "Профиль", icon: UserCircleIcon },
+];
+
+const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, projects, logout, announcement, maintenance }) => {
+  const [skin, setSkin] = useState<Skin>(getSkin);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Ctrl/Cmd+K — командная палитра
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
-    <div className="min-h-screen gradient-bg">
-      {/* Premium Header */}
-      <header className="sticky top-0 z-50 glass-strong border-b border-border-color backdrop-blur-xl">
-        <div className="max-w-[1400px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            
-            {/* Logo Section */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 group cursor-pointer" onClick={() => window.location.href = '/'}>
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/25 group-hover:shadow-violet-500/40 transition-all duration-300">
-                  <SparklesIcon className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gradient tracking-tight">Distort Studio</h1>
-                  <p className="text-xs text-text-muted -mt-0.5">{currentUser?.username}</p>
-                </div>
+    <ConfirmProvider>
+      <PlayerProvider>
+      <LiveRoomProvider currentUserId={currentUser.id}>
+      <div className="app-shell">
+      <Atmosphere />
+      <AppWatchers />
+
+      <Sidebar currentUser={currentUser} />
+
+      <div className="app-main">
+        <TopNav
+          currentUser={currentUser}
+          skin={skin}
+          onSkinChange={setSkin}
+          logout={logout}
+          onOpenPalette={() => setPaletteOpen(true)}
+        />
+
+        <main className="app-content">
+          <div className="app-container">
+            {maintenance && (
+              <div className="site-announcement warning">
+                <ExclamationTriangleIcon style={{ width: 16, height: 16, flex: "0 0 auto" }} />
+                <span>Включён режим техобслуживания — обычные пользователи видят заглушку.</span>
               </div>
-
-              {/* Navigation */}
-              <nav className="hidden lg:flex items-center gap-2 ml-8">
-                <a href="/" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
-                  <ChartBarIcon className="w-4 h-4" />
-                  Дашборд
-                </a>
-                <a href="/projects" className="btn btn-sm btn-secondary rounded-lg">Проекты</a>
-                <a href="/sessions" className="btn btn-sm btn-secondary rounded-lg">Сессии</a>
-                <a href="/marketplace" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
-                  <ShoppingCartIcon className="w-4 h-4" />
-                  Магазин
-                </a>
-                <a href="/gallery" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
-                  <PhotoIcon className="w-4 h-4" />
-                  Галерея
-                </a>
-                <a href="/friends" className="btn btn-sm btn-secondary rounded-lg flex items-center gap-2">
-                  <UserGroupIcon className="w-4 h-4" />
-                  Друзья
-                </a>
-              </nav>
-            </div>
-
-            {/* Right Section */}
-            <div className="flex items-center gap-3">
-              <ThemeSwitcher />
-              
-              <a href="/profile" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity px-3 py-2 rounded-xl hover:bg-bg-hover">
-                <Avatar username={currentUser?.username || ""} url={currentUser?.avatarUrl} />
-                <span className="text-sm text-text-secondary font-medium hidden lg:inline">{currentUser?.username}</span>
-              </a>
-              
-              <button
-                onClick={logout}
-                className="btn btn-danger btn-sm rounded-lg"
-              >
-                <ArrowLeftOnRectangleIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">Выйти</span>
-              </button>
-            </div>
+            )}
+            {announcement?.enabled && announcement.text && (
+              <div className={`site-announcement ${announcement.level || "info"}`}>
+                <MegaphoneIcon style={{ width: 16, height: 16, flex: "0 0 auto" }} />
+                <span>{announcement.text}</span>
+                {announcement.link && (
+                  <a href={announcement.link} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", whiteSpace: "nowrap" }}>
+                    Подробнее
+                  </a>
+                )}
+              </div>
+            )}
+            <EmailVerificationBanner currentUser={currentUser} />
+            {children}
           </div>
-        </div>
-      </header>
+        </main>
+      </div>
 
-      {/* Main Content Area */}
-      <main className="max-w-[1400px] mx-auto px-6 py-8">
-        {children}
-      </main>
-    </div>
+      <nav className="mobile-nav">
+        {MOBILE_NAV.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) => (isActive ? "active" : "")}
+          >
+            <item.icon />
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        projects={projects}
+      />
+
+      <PlayerDock />
+      </div>
+      </LiveRoomProvider>
+      </PlayerProvider>
+    </ConfirmProvider>
   );
 };
 

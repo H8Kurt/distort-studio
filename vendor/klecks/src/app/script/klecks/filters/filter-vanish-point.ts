@@ -1,0 +1,309 @@
+import { BB } from '../../bb/bb';
+import { TFilterApply, TFilterGetDialogParam, TFilterGetDialogResult, TRgb } from '../kl-types';
+import { LANG } from '../../language/language';
+import { Input } from '../ui/components/input';
+import { ColorOptions } from '../ui/components/color-options';
+import { drawVanishPoint } from '../image-operations/draw-vanish-point';
+import { KlSlider } from '../ui/components/kl-slider';
+import { EVENT_RES_MS } from './filters-consts';
+import { css } from '../../bb/base/base';
+import { Preview } from '../ui/project-viewport/preview';
+import { TProjectViewportProject } from '../ui/project-viewport/project-viewport';
+import { DraggableInput } from '../ui/components/draggable-input';
+import { testIsSmall } from '../ui/utils/test-is-small';
+import { getPreviewHeight, getPreviewWidth } from '../ui/utils/preview-size';
+import { canvasToLayerTiles } from '../history/push-helpers/canvas-to-layer-tiles';
+import { freeCanvas } from '../../bb/base/canvas';
+
+export type TFilterVanishPointInput = {
+    x: number;
+    y: number;
+    lines: number;
+    thickness: number;
+    color: TRgb;
+    opacity: number;
+};
+
+export const filterVanishPoint = {
+    getDialog(params: TFilterGetDialogParam) {
+        const klCanvas = params.klCanvas;
+        const selectedLayerIndex = params.selectedLayerIndex;
+        const layer = klCanvas.getLayer(selectedLayerIndex);
+        const layers = klCanvas.getLayers();
+
+        const previewCanvas = BB.canvas(layer.canvas.width, layer.canvas.height);
+        const previewCtx = BB.ctx(previewCanvas);
+
+        const rootEl = BB.el();
+        const result: TFilterGetDialogResult<TFilterVanishPointInput> = {
+            element: rootEl,
+        };
+        const isSmall = testIsSmall();
+        if (!isSmall) {
+            result.width = getPreviewWidth(isSmall);
+        }
+
+        const settingsObj: TFilterVanishPointInput = {
+            x: layer.canvas.width / 2,
+            y: layer.canvas.height / 2,
+            lines: 8,
+            thickness: 2,
+            color: { r: 0, g: 0, b: 0 },
+            opacity: 1,
+        };
+
+        const linesSlider = new KlSlider({
+            label: LANG('filter-vanish-point-lines'),
+            width: 300,
+            height: 30,
+            min: 2,
+            max: 40,
+            value: settingsObj.lines,
+            exponent: 2,
+            eventResMs: EVENT_RES_MS,
+            onChange: function (val) {
+                settingsObj.lines = Math.round(val);
+                update();
+            },
+        });
+        linesSlider.getElement().style.marginBottom = '10px';
+        rootEl.append(linesSlider.getElement());
+
+        const line1 = BB.el({
+            parent: rootEl,
+            css: {
+                display: 'flex',
+                alignItems: 'center',
+            },
+        });
+        const line2 = BB.el({
+            parent: rootEl,
+            css: {
+                display: 'flex',
+                alignItems: 'center',
+                marginTop: 10,
+                marginBottom: 10,
+            },
+        });
+        const xInput = new Input({
+            init: settingsObj.x,
+            type: 'number',
+            name: 'vanish-point-x',
+            css: { width: 75, marginRight: 20 },
+            onChange: function (v) {
+                settingsObj.x = v;
+                dragInput.setValue({
+                    x: settingsObj.x,
+                    y: settingsObj.y,
+                });
+                update();
+            },
+        });
+        const yInput = new Input({
+            init: settingsObj.y,
+            type: 'number',
+            name: 'vanish-point-y',
+            css: { width: 75, marginRight: 20 },
+            onChange: function (v) {
+                settingsObj.y = v;
+                dragInput.setValue({
+                    x: settingsObj.x,
+                    y: settingsObj.y,
+                });
+                update();
+            },
+        });
+        const thicknessInput = new Input({
+            init: 2,
+            type: 'number',
+            name: 'vanish-point-thickness',
+            min: 1,
+            step: 1,
+            css: { width: 75, marginRight: 20 },
+            onChange: function (v) {
+                settingsObj.thickness = v;
+                update();
+            },
+        });
+
+        let selectedRgbaObj = { r: 0, g: 0, b: 0, a: 1 };
+        const colorOptionsArr = [
+            { r: 0, g: 0, b: 0, a: 1 },
+            { r: 255, g: 255, b: 255, a: 1 },
+        ];
+        colorOptionsArr.push({
+            r: params.currentColorRgb.r,
+            g: params.currentColorRgb.g,
+            b: params.currentColorRgb.b,
+            a: 1,
+        });
+        colorOptionsArr.push({
+            r: params.secondaryColorRgb.r,
+            g: params.secondaryColorRgb.g,
+            b: params.secondaryColorRgb.b,
+            a: 1,
+        });
+        settingsObj.color = BB.copyObj(selectedRgbaObj);
+
+        const colorOptions = new ColorOptions({
+            label: LANG('shape-stroke'),
+            colorArr: colorOptionsArr,
+            onChange: function (rgbaObj) {
+                selectedRgbaObj = rgbaObj!;
+                settingsObj.color = BB.copyObj(selectedRgbaObj);
+                update();
+            },
+        });
+
+        const labelStyle = {
+            display: 'inline-block',
+            marginRight: 5,
+        };
+        line1.append(
+            BB.el({ content: 'X:', css: labelStyle }),
+            xInput.getElement(),
+            BB.el({ content: 'Y:', css: labelStyle }),
+            yInput.getElement(),
+        );
+        line2.append(
+            BB.el({ content: LANG('shape-line-width') + ':', css: labelStyle }),
+            thicknessInput.getElement(),
+            BB.el({ css: { flexGrow: 1 } }),
+            colorOptions.getElement(),
+        );
+
+        // ---- preview input processing ----
+        function syncInputs(): void {
+            xInput.setValue(settingsObj.x);
+            yInput.setValue(settingsObj.y);
+        }
+
+        function update(): void {
+            const ctx = previewCtx;
+            const w = previewCanvas.width;
+            const h = previewCanvas.height;
+
+            ctx.save();
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(layer.canvas, 0, 0, w, h);
+            drawVanishPoint(
+                ctx,
+                settingsObj.x,
+                settingsObj.y,
+                settingsObj.lines,
+                Math.max(settingsObj.thickness, 1),
+                settingsObj.color,
+                settingsObj.opacity,
+            );
+
+            ctx.restore();
+            preview.render();
+        }
+
+        const onRender = () => {
+            dragInput.setTransform(preview.getTransform());
+            return previewCanvas;
+        };
+
+        const previewLayerArr: TProjectViewportProject['layers'] = [];
+        {
+            for (let i = 0; i < layers.length; i++) {
+                previewLayerArr.push({
+                    image: i === selectedLayerIndex ? onRender : layers[i].canvas,
+                    isVisible: layers[i].isVisible,
+                    opacity: layers[i].opacity,
+                    mixModeStr: layers[i].mixModeStr,
+                    hasClipping: layers[i].hasClipping,
+                });
+            }
+        }
+
+        const preview = new Preview({
+            width: getPreviewWidth(isSmall),
+            height: getPreviewHeight(isSmall),
+            project: {
+                width: layer.canvas.width,
+                height: layer.canvas.height,
+                layers: previewLayerArr,
+            },
+        });
+        css(preview.getElement(), {
+            marginLeft: -20,
+            marginRight: -20,
+            overflow: 'hidden',
+        });
+
+        const dragInput = new DraggableInput({
+            value: {
+                x: settingsObj.x,
+                y: settingsObj.y,
+            },
+            onChange: (val) => {
+                settingsObj.x = Math.round(val.x);
+                settingsObj.y = Math.round(val.y);
+                syncInputs();
+                update();
+            },
+        });
+
+        update();
+
+        preview.getElement().append(dragInput.getElement());
+        rootEl.append(preview.getElement());
+
+        result.destroy = () => {
+            linesSlider.destroy();
+            colorOptions.destroy();
+            preview.destroy();
+            xInput.destroy();
+            yInput.destroy();
+            thicknessInput.destroy();
+            dragInput.destroy();
+            freeCanvas(previewCanvas);
+        };
+        result.getInput = function (): TFilterVanishPointInput {
+            result.destroy!();
+            return BB.copyObj(settingsObj);
+        };
+        return result;
+    },
+
+    apply(params: TFilterApply<TFilterVanishPointInput>): boolean {
+        const context = params.layer.context;
+        const klCanvas = params.klCanvas;
+        const klHistory = params.klHistory;
+        if (!context || !klCanvas) {
+            return false;
+        }
+
+        drawVanishPoint(
+            context,
+            params.input.x,
+            params.input.y,
+            params.input.lines,
+            params.input.thickness,
+            params.input.color,
+            params.input.opacity,
+        );
+        {
+            const layerMap = Object.fromEntries(
+                params.klCanvas.getLayers().map((layerItem) => {
+                    if (layerItem.id === params.layer.id) {
+                        return [
+                            layerItem.id,
+                            {
+                                tiles: canvasToLayerTiles(params.layer.canvas),
+                            },
+                        ];
+                    }
+
+                    return [layerItem.id, {}];
+                }),
+            );
+            klHistory.push({
+                layerMap,
+            });
+        }
+        return true;
+    },
+};

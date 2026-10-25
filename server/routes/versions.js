@@ -6,6 +6,20 @@ const Version = require('../models/Version');
 const Branch = require('../models/Branch');
 const Collab = require('../models/Collab');
 const User = require('../models/User');
+const { notify } = require('../lib/notify');
+
+// Хелпер проверки доступа к проекту
+async function resolveAccess(req, projectId) {
+  const project = await Project.findByPk(projectId);
+  if (!project) return { project: null };
+  const isOwner = project.UserId === req.user.id;
+  const collab = await Collab.findOne({
+    where: { projectId, userId: req.user.id, status: 'accepted' },
+  });
+  const isEditor = isOwner || (collab && (collab.role === 'owner' || collab.role === 'editor'));
+  const canView = isEditor || project.visibility === 'PUBLIC' || !!collab;
+  return { project, isOwner, collab, isEditor, canView };
+}
 
 // POST /api/projects/:id/fork - создать форк проекта
 router.post('/:id/fork', auth, async (req, res) => {
@@ -24,6 +38,8 @@ router.post('/:id/fork', auth, async (req, res) => {
       title: name || `${originalProject.title} (Fork)`,
       description: `Fork of "${originalProject.title}" by ${originalProject.description || ''}`,
       UserId: req.user.id,
+      forkedFromId: originalProject.id,
+      rootId: originalProject.rootId || originalProject.id,
     });
 
     // Копируем последнюю версию если есть
@@ -88,6 +104,10 @@ router.post('/:id/fork', auth, async (req, res) => {
 router.get('/:id/versions', auth, async (req, res) => {
   try {
     const { id } = req.params;
+    const { project, canView } = await resolveAccess(req, id);
+    if (!project) return res.status(404).json({ error: 'Проект не найден' });
+    if (!canView) return res.status(403).json({ error: 'Нет доступа к проекту' });
+
     const versions = await Version.findAll({
       where: { projectId: id },
       include: [
@@ -98,7 +118,8 @@ router.get('/:id/versions', auth, async (req, res) => {
         },
         {
           model: User,
-          attributes: ['id', 'username'],
+          as: 'author',
+          attributes: ['id', 'username', 'avatarUrl'],
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -116,9 +137,12 @@ router.post('/:id/versions', auth, async (req, res) => {
     const { id } = req.params;
     const { message, storageManifest, parentVersionId } = req.body;
 
-    const project = await Project.findByPk(id);
+    const { project, isEditor } = await resolveAccess(req, id);
     if (!project) {
       return res.status(404).json({ error: 'Проект не найден' });
+    }
+    if (!isEditor) {
+      return res.status(403).json({ error: 'Нет прав для создания версии' });
     }
 
     // Если parentVersionId не указан, берём последнюю версию
@@ -172,6 +196,10 @@ router.post('/:id/versions', auth, async (req, res) => {
 router.get('/:id/branches', auth, async (req, res) => {
   try {
     const { id } = req.params;
+    const { project, canView } = await resolveAccess(req, id);
+    if (!project) return res.status(404).json({ error: 'Проект не найден' });
+    if (!canView) return res.status(403).json({ error: 'Нет доступа к проекту' });
+
     const branches = await Branch.findAll({
       where: { projectId: id },
       include: [{ model: Version, attributes: ['id', 'message', 'createdAt'] }],
@@ -190,9 +218,12 @@ router.post('/:id/branches', auth, async (req, res) => {
     const { id } = req.params;
     const { name, versionId } = req.body;
 
-    const project = await Project.findByPk(id);
+    const { project, isEditor } = await resolveAccess(req, id);
     if (!project) {
       return res.status(404).json({ error: 'Проект не найден' });
+    }
+    if (!isEditor) {
+      return res.status(403).json({ error: 'Нет прав для создания ветки' });
     }
 
     // Если versionId не указан, берём версию из main
@@ -222,13 +253,21 @@ router.post('/:id/branches', auth, async (req, res) => {
   }
 });
 
-// GET /api/projects/:id/collabs - получить коллабораторов
+// GET /api/projects/:id/collabs - участники и приглашения проекта
 router.get('/:id/collabs', auth, async (req, res) => {
   try {
     const { id } = req.params;
+    const access = await resolveAccess(req, id);
+    if (!access.project) return res.status(404).json({ error: 'Проект не найден' });
+    if (!access.canView) return res.status(403).json({ error: 'Нет доступа к проекту' });
+
     const collabs = await Collab.findAll({
       where: { projectId: id },
-      include: [{ model: User, attributes: ['id', 'username', 'email'] }],
+      include: [
+        { model: User, attributes: ['id', 'username', 'avatarUrl'] },
+        { model: User, as: 'inviter', attributes: ['id', 'username'] },
+      ],
+      order: [['createdAt', 'ASC']],
     });
     res.json(collabs);
   } catch (err) {
@@ -237,7 +276,7 @@ router.get('/:id/collabs', auth, async (req, res) => {
   }
 });
 
-// POST /api/projects/:id/collabs - добавить коллаборатора
+// POST /api/projects/:id/collabs - пригласить коллаборатора (pending)
 router.post('/:id/collabs', auth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -252,29 +291,62 @@ router.post('/:id/collabs', auth, async (req, res) => {
       return res.status(404).json({ error: 'Проект не найден' });
     }
 
-    // Проверяем что текущий пользователь имеет право добавлять
+    if (Number(userId) === project.UserId) {
+      return res.status(400).json({ error: 'Владелец уже участвует в проекте' });
+    }
+    if (Number(userId) === req.user.id) {
+      return res.status(400).json({ error: 'Нельзя пригласить себя' });
+    }
+
+    // Проверяем что текущий пользователь имеет право приглашать
     const userCollab = await Collab.findOne({
-      where: { projectId: id, userId: req.user.id },
+      where: { projectId: id, userId: req.user.id, status: 'accepted' },
     });
 
     if (project.UserId !== req.user.id && (!userCollab || userCollab.role === 'viewer')) {
-      return res.status(403).json({ error: 'Нет прав для добавления участников' });
+      return res.status(403).json({ error: 'Нет прав для приглашения участников' });
     }
 
-    const collab = await Collab.create({
-      projectId: id,
+    const targetUser = await User.findByPk(userId, { attributes: ['id', 'username'] });
+    if (!targetUser) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    const inviteRole = role === 'editor' ? 'editor' : 'viewer';
+
+    let collab = await Collab.findOne({ where: { projectId: id, userId } });
+    if (collab) {
+      if (collab.status === 'accepted') {
+        return res.status(400).json({ error: 'Пользователь уже участник проекта' });
+      }
+      collab.status = 'pending';
+      collab.role = inviteRole;
+      collab.invitedById = req.user.id;
+      await collab.save();
+    } else {
+      collab = await Collab.create({
+        projectId: id,
+        userId,
+        role: inviteRole,
+        status: 'pending',
+        invitedById: req.user.id,
+      });
+    }
+
+    await notify(req.app, {
       userId,
-      role: role || 'viewer',
+      actorId: req.user.id,
+      type: 'collab_invite',
+      projectId: project.id,
+      message: `приглашает вас в проект «${project.title}»`,
     });
 
     const io = req.app.get('io');
     if (io) {
-      io.to(`project_${id}`).emit('collab:added', collab);
+      io.to(`project_${id}`).emit('collab:invited', collab);
     }
 
     res.json(collab);
   } catch (err) {
-    console.error('Ошибка добавления коллаборатора:', err);
+    console.error('Ошибка приглашения коллаборатора:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -296,7 +368,7 @@ router.put('/:id/collaborators/:userId/role', auth, async (req, res) => {
 
     // Проверяем права текущего пользователя
     const userCollab = await Collab.findOne({
-      where: { projectId: id, userId: req.user.id },
+      where: { projectId: id, userId: req.user.id, status: 'accepted' },
     });
 
     if (project.UserId !== req.user.id && (!userCollab || userCollab.role !== 'owner')) {
@@ -304,7 +376,7 @@ router.put('/:id/collaborators/:userId/role', auth, async (req, res) => {
     }
 
     const collab = await Collab.findOne({
-      where: { projectId: id, userId },
+      where: { projectId: id, userId, status: 'accepted' },
     });
 
     if (!collab) {
@@ -342,10 +414,11 @@ router.delete('/:id/collaborators/:userId', auth, async (req, res) => {
 
     // Проверяем права текущего пользователя
     const userCollab = await Collab.findOne({
-      where: { projectId: id, userId: req.user.id },
+      where: { projectId: id, userId: req.user.id, status: 'accepted' },
     });
 
-    if (project.UserId !== req.user.id && (!userCollab || userCollab.role !== 'owner')) {
+    const isSelf = Number(userId) === req.user.id;
+    if (!isSelf && project.UserId !== req.user.id && (!userCollab || userCollab.role !== 'owner')) {
       return res.status(403).json({ error: 'Нет прав для удаления участников' });
     }
 
@@ -380,9 +453,12 @@ router.post('/:id/versions/:versionId/restore', auth, async (req, res) => {
   try {
     const { id, versionId } = req.params;
 
-    const project = await Project.findByPk(id);
+    const { project, isEditor } = await resolveAccess(req, id);
     if (!project) {
       return res.status(404).json({ error: 'Проект не найден' });
+    }
+    if (!isEditor) {
+      return res.status(403).json({ error: 'Нет прав для восстановления версии' });
     }
 
     const versionToRestore = await Version.findByPk(versionId);
@@ -423,6 +499,68 @@ router.post('/:id/versions/:versionId/restore', auth, async (req, res) => {
     res.json(newVersion);
   } catch (err) {
     console.error('Ошибка восстановления версии:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/projects/:id/tree - дерево форков (родословная)
+router.get('/:id/tree', auth, async (req, res) => {
+  try {
+    const project = await Project.findByPk(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Проект не найден' });
+
+    // Поднимаемся к корню дерева по цепочке forkedFromId
+    let root = project;
+    const seenUp = new Set([root.id]);
+    let guard = 0;
+    while (root.forkedFromId && guard < 100) {
+      const parent = await Project.findByPk(root.forkedFromId);
+      if (!parent || seenUp.has(parent.id)) break;
+      seenUp.add(parent.id);
+      root = parent;
+      guard += 1;
+    }
+
+    // BFS по потомкам (для скорости — уровни через IN-запросы)
+    const nodes = [];
+    const seen = new Set();
+    let frontier = [root.id];
+    while (frontier.length && nodes.length < 300) {
+      const rows = await Project.findAll({
+        where: { id: frontier },
+        include: [{ model: User, as: 'owner', attributes: ['id', 'username', 'avatarUrl', 'frameId'] }],
+      });
+      const ordered = frontier.map((id) => rows.find((r) => r.id === id)).filter(Boolean);
+      for (const r of ordered) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        nodes.push({
+          id: r.id,
+          title: r.title,
+          coverUrl: r.coverUrl,
+          visibility: r.visibility,
+          publishedAt: r.publishedAt,
+          forkedFromId: r.forkedFromId,
+          createdAt: r.createdAt,
+          owner: r.owner
+            ? { id: r.owner.id, username: r.owner.username, avatarUrl: r.owner.avatarUrl, frameId: r.owner.frameId }
+            : null,
+        });
+      }
+      const children = await Project.findAll({
+        where: { forkedFromId: frontier },
+        attributes: ['id'],
+      });
+      frontier = children.map((c) => c.id).filter((id) => !seen.has(id));
+    }
+
+    res.json({
+      rootId: root.id,
+      currentId: project.id,
+      nodes,
+    });
+  } catch (err) {
+    console.error('Ошибка получения дерева форков:', err);
     res.status(500).json({ error: err.message });
   }
 });

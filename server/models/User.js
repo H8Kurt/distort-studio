@@ -14,8 +14,17 @@ const User = sequelize.define('User', {
   role: { type: DataTypes.STRING, defaultValue: 'user' },
   bio: { type: DataTypes.TEXT },
   avatarUrl: { type: DataTypes.STRING },
+  bannerUrl: { type: DataTypes.STRING },
+  frameId: { type: DataTypes.STRING, defaultValue: 'none' },
   rebelRank: { type: DataTypes.INTEGER, defaultValue: 1 },
-  refreshToken: { type: DataTypes.STRING }
+  lastSeenAt: { type: DataTypes.DATE, allowNull: true },
+  refreshToken: { type: DataTypes.STRING },
+  status: { type: DataTypes.ENUM('active', 'suspended', 'banned'), defaultValue: 'active' },
+  isOfficial: { type: DataTypes.BOOLEAN, defaultValue: false },
+  bannedAt: { type: DataTypes.DATE, allowNull: true },
+  banReason: { type: DataTypes.STRING, allowNull: true },
+  emailVerified: { type: DataTypes.BOOLEAN, defaultValue: false },
+  emailVerifiedAt: { type: DataTypes.DATE, allowNull: true }
 });
 
 User.beforeCreate(async (user) => {

@@ -1,0 +1,84 @@
+import { TRenderTextParam } from '../../../image-operations/render-text';
+import { BB } from '../../../../bb/bb';
+import { LANG } from '../../../../language/language';
+import { c } from '../../../../bb/base/c';
+import { Destroyer } from '../../../../bb/base/base';
+
+type TTextParams = Pick<TRenderTextParam, 'text'>;
+
+export type TTextUIParams = TTextParams & {
+    onUpdate: (v: Partial<TTextParams>) => void;
+};
+
+export class TextToolTextUI {
+    private readonly rootEl: HTMLElement;
+
+    private readonly textInput: HTMLTextAreaElement;
+    private readonly destroyer = new Destroyer();
+    private lastEmittedText: string;
+    private readonly onUpdate: (v: Partial<TTextParams>) => void;
+
+    private readonly onInput = (): void => {
+        this.emit();
+    };
+
+    private emit(): void {
+        const text = this.textInput.value;
+        if (text === this.lastEmittedText) {
+            return;
+        }
+        this.lastEmittedText = text;
+        this.onUpdate({
+            text,
+        });
+    }
+
+    // ----------------------------------- public -----------------------------------
+    constructor(p: TTextUIParams) {
+        this.lastEmittedText = p.text;
+        this.onUpdate = p.onUpdate;
+
+        this.rootEl = c('');
+
+        this.textInput = BB.el({
+            tagName: 'textarea',
+            parent: this.rootEl,
+            content: p.text,
+            destroyer: this.destroyer,
+            props: {
+                placeholder: LANG('text-placeholder'),
+            },
+            css: {
+                whiteSpace: 'pre',
+                overflow: 'auto',
+                width: '100%',
+                height: 70,
+                resize: 'vertical',
+            },
+            onChange: () => {
+                this.emit();
+            },
+        });
+
+        this.textInput.addEventListener('input', this.onInput);
+    }
+
+    getElement(): HTMLElement {
+        return this.rootEl;
+    }
+
+    getValues(): TTextParams {
+        return {
+            text: this.textInput.value,
+        };
+    }
+
+    focus(): void {
+        this.textInput.focus();
+    }
+
+    destroy(): void {
+        this.destroyer.destroy();
+        this.textInput.removeEventListener('input', this.onInput);
+    }
+}

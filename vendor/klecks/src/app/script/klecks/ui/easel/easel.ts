@@ -1,0 +1,928 @@
+import { c } from '../../../bb/base/c';
+import { ProjectViewport, TViewportTransform } from '../project-viewport/project-viewport';
+import { PointerListener } from '../../../bb/input/pointer-listener';
+import { BB } from '../../../bb/bb';
+import { toMetaTransform } from '../../../bb/transform/to-meta-transform';
+import { createTransform } from '../../../bb/transform/create-transform';
+import { createMatrixFromTransform } from '../../../bb/transform/create-matrix-from-transform';
+import { applyToPoint, inverse } from 'transformation-matrix';
+import { EaselPointerPreprocessor } from './easel-pointer-preprocessor';
+import { KeyListener } from '../../../bb/input/key-listener';
+import {
+    TArrowKey,
+    TEaselInterface,
+    TEaselProject,
+    TEaselTool,
+    TEaselToolTrigger,
+} from './easel.types';
+import { TVector2D } from '../../../bb/bb-types';
+import { zoomByStep } from '../project-viewport/utils/zoom-by-step';
+import { SelectionRenderer } from './selection-renderer';
+import { KL_CONFIG } from '../../kl-config';
+import { minimizeAngleDeg, snapAngleDeg } from '../../../bb/math/math';
+import {
+    DEFAULT_DOUBLE_TAP_POINTER_TYPES,
+    EASEL_MAX_SCALE,
+    EASEL_MIN_SCALE,
+    TEMP_TRIGGERS,
+    TEMP_TRIGGERS_KEYS,
+} from './easel.config';
+import { isTransformEqual } from '../project-viewport/utils/is-transform-equal';
+import { blendTransform } from '../project-viewport/utils/blend-transform';
+import { getFitRectTransform } from '../project-viewport/utils/get-fit-rect-transform';
+import { css } from '../../../bb/base/base';
+import { TWheelEvent } from '../../../bb/input/event.types';
+import { getIconSvg } from '../../../icon/icon';
+import { type IconName } from '../../../../icons/icons';
+import { LANG } from '../../../language/language';
+
+function getToolEntries<GToolId extends string>(
+    tools: Record<GToolId, TEaselTool>,
+): [GToolId, TEaselTool][] {
+    return Object.entries(tools) as [GToolId, TEaselTool][];
+}
+
+export type TEaselParams<GToolId extends string> = {
+    width: number; // size of DOM element
+    height: number; // size of DOM element
+    project: TEaselProject;
+    tools: Record<GToolId, TEaselTool>;
+    tool: NoInfer<GToolId>;
+    onChangeTool: (toolId: NoInfer<GToolId>) => void;
+    onTransformChange: (transform: TViewportTransform, scaleOrAngleChanged: boolean) => void; // whenever Viewport changes
+    onBeforeRender?: () => void;
+    onUndo?: () => void; // gesture triggers undo
+    onRedo?: () => void; // gesture triggers redo
+    onResetSelection: () => void; // via selection indicator
+};
+
+/**
+ * An interactive project viewport, that also renders the selection. You interact with it through modes (aka tools).
+ * One tool is active at a time. temp trigger can overwrite it temporarily.
+ */
+export class Easel<GToolId extends string> {
+    private readonly rootEl: HTMLElement;
+    private readonly svgEl: SVGElement; // each tool gets an element in this SVG tag, for an SVG overlay
+    private readonly htmlOverlayEl: HTMLElement; // each tool can get an element in this html node, for an interactive overlay
+    private readonly mirrorIndicatorEl: HTMLElement;
+    private readonly selectionIndicatorEl: HTMLElement;
+    private readonly viewport: ProjectViewport;
+    private readonly pointerPreprocessor: EaselPointerPreprocessor;
+    private readonly pointerListener: PointerListener;
+    private readonly windowPointerListener: (e: PointerEvent) => void;
+    private readonly keyListener: KeyListener;
+    private readonly selectionRenderer: SelectionRenderer;
+
+    // from params
+    private readonly toolsMap: TEaselParams<GToolId>['tools'];
+    // temp tool is tool that is active during holding a key or mouse button (e.g. hold space -> hand tool)
+    private readonly tempTools: Record<TEaselToolTrigger, GToolId | undefined>;
+    private readonly onChangeTool: TEaselParams<GToolId>['onChangeTool'];
+    private readonly onTransformChange: (
+        transform: TViewportTransform,
+        scaleOrAngleChanged: boolean,
+    ) => void;
+    private readonly onUndo: (() => void) | undefined;
+    private readonly onRedo: (() => void) | undefined;
+
+    // state
+    private project: TEaselProject;
+    private width: number;
+    private height: number;
+    private toolId: GToolId;
+    private tempToolId: GToolId | undefined;
+    private animationFrameId: ReturnType<typeof requestAnimationFrame> | undefined;
+    private doRender = false; // true -> will render on next renderLoop
+    private cursorPos: TVector2D | undefined; // so brush cursor not top left corner after reload
+    private isFrozen: boolean = false; // disable interaction with the easel whatsoever
+    private lastRenderedTransform: TViewportTransform = {} as TViewportTransform; // previously rendered viewport transformation
+    private pinchInitialTransform: TViewportTransform | undefined; // when starting a pinch-to-zoom gesture
+    private targetTransform: TViewportTransform;
+
+    // custom interface passed to tools
+    private readonly easelInterface: TEaselInterface = {
+        setCursor: (cursor) => (this.rootEl.style.cursor = cursor),
+        getTransform: () => this.viewport.getTransform(),
+        getTargetTransform: () => this.targetTransform,
+        getSize: () => ({ width: this.width, height: this.height }),
+        getProjectSize: () => ({ width: this.project.width, height: this.project.height }),
+        setTransform: (transform, isImmediate) => this.setTargetTransform(transform, isImmediate),
+        requestRender: () => this.requestRender(),
+        isKeyPressed: (keyStr) => this.keyListener.isPressed(keyStr),
+        minScale: EASEL_MIN_SCALE,
+        maxScale: EASEL_MAX_SCALE,
+        setAngleDeg: (...args) => this.setAngleDeg(...args),
+        keyListener: {} as KeyListener, // this.keyListener
+        updateDoubleTapPointerTypes: () => this.updateDoubleTapPointerTypes(),
+        setRenderedSelection: (selection) => this.selectionRenderer.setRenderedSelection(selection),
+        clearRenderedSelection: (isImmediate) =>
+            this.selectionRenderer.clearRenderedSelection(isImmediate),
+        onWheel: (e) => this.onWheel(e),
+        getElement: () => this.rootEl,
+    };
+
+    private setTargetTransform(transform: TViewportTransform, isImmediate?: boolean): void {
+        if (isImmediate) {
+            this.viewport.setTransform(transform);
+        }
+        this.targetTransform = transform;
+        this.doRender = true;
+    }
+
+    private updateToolSvgs(): void {
+        const targetTool = this.tempToolId ?? this.toolId;
+        getToolEntries(this.toolsMap).forEach(([toolId, tool]) => {
+            tool.getSvgElement().style.display = toolId === targetTool ? '' : 'none';
+        });
+    }
+
+    // different tools allow different pointer types to trigger the gesture
+    private updateDoubleTapPointerTypes(): void {
+        const pointerTypes =
+            this.toolsMap[this.tempToolId ?? this.toolId].doubleTapPointerTypes ??
+            DEFAULT_DOUBLE_TAP_POINTER_TYPES;
+        this.pointerPreprocessor.setDoubleTapPointerTypes(pointerTypes);
+    }
+
+    private lastFrameTimestamp: number = 0;
+    /**
+     * Only call once from outside. Will perpetuate itself and render when doRender = true
+     */
+    private renderLoop(): void {
+        const now = performance.now();
+        const deltaMs = now - this.lastFrameTimestamp;
+        this.lastFrameTimestamp = now;
+        this.animationFrameId = requestAnimationFrame(() => this.renderLoop());
+        if (!this.doRender) {
+            return;
+        }
+        const tool = this.getActiveTool();
+        const oldTransform = this.viewport.getTransform();
+        let newTransform = oldTransform;
+        if (isTransformEqual(oldTransform, this.targetTransform)) {
+            this.doRender = false;
+        } else {
+            const defaultDeltaMs = 1000 / 60;
+            const timeFactor = deltaMs / defaultDeltaMs;
+            const easeFactor = 1 - 0.7 ** timeFactor;
+
+            newTransform = blendTransform(
+                oldTransform,
+                this.targetTransform,
+                {
+                    width: this.project.width,
+                    height: this.project.height,
+                },
+                {
+                    x: this.width / 2,
+                    y: this.height / 2,
+                },
+                easeFactor,
+            );
+            this.viewport.setTransform(newTransform);
+        }
+
+        // todo: is last renderedTransform needed?
+
+        const isPositionChanged =
+            newTransform.x !== this.lastRenderedTransform.x ||
+            newTransform.y !== this.lastRenderedTransform.y;
+        const isScaleOrAngleChanged =
+            newTransform.scale !== this.lastRenderedTransform.scale ||
+            newTransform.angleDeg !== this.lastRenderedTransform.angleDeg;
+        const isMirroredChanged = newTransform.isMirrored !== this.lastRenderedTransform.isMirrored;
+
+        this.viewport.render(!isTransformEqual(oldTransform, newTransform));
+        if (isPositionChanged || isScaleOrAngleChanged || isMirroredChanged) {
+            tool.onUpdateTransform?.(newTransform);
+            this.selectionRenderer.setTransform(newTransform);
+            this.onTransformChange(this.targetTransform, isScaleOrAngleChanged);
+            this.lastRenderedTransform = newTransform;
+        }
+    }
+
+    /**
+     * activate temporary tool. Can only push one.
+     */
+    private pushTempTool(toolId: GToolId | undefined): void {
+        if (this.tempToolId !== undefined || toolId === undefined) {
+            return;
+        }
+        const tool = this.toolsMap[this.toolId];
+        if (tool.getIsLocked?.()) {
+            return;
+        }
+
+        this.tempToolId = toolId;
+        const activeToolId = this.getActiveToolId();
+        this.toolsMap[activeToolId].activate?.(this.cursorPos);
+        Object.values<TEaselTool>(this.toolsMap).forEach((tool) => tool.onTool?.(activeToolId));
+        this.updateToolSvgs();
+        this.updateDoubleTapPointerTypes();
+    }
+
+    /**
+     * Turn off temporary tool
+     */
+    private popTempTool(toolId: GToolId | undefined): void {
+        if (this.tempToolId !== toolId || toolId === undefined) {
+            return;
+        }
+        this.tempToolId = undefined;
+        this.getActiveTool().activate?.(this.cursorPos, true);
+        const activeToolId = this.getActiveToolId();
+        Object.values<TEaselTool>(this.toolsMap).forEach((tool) => tool.onTool?.(activeToolId));
+        this.updateToolSvgs();
+        this.updateDoubleTapPointerTypes();
+    }
+
+    private getActiveToolId(): GToolId {
+        return this.tempToolId ?? this.toolId;
+    }
+
+    private getActiveTool(): TEaselTool {
+        return this.toolsMap[this.getActiveToolId()];
+    }
+
+    private getResetTransform(isMirrored: boolean = false): TViewportTransform {
+        return createTransform(
+            {
+                x: this.width / 2,
+                y: this.height / 2,
+            },
+            { x: this.project.width / 2, y: this.project.height / 2 },
+            1,
+            0,
+            isMirrored,
+        );
+    }
+
+    private getFitTransform(): TViewportTransform {
+        return getFitRectTransform(
+            { x: 0, y: 0, width: this.project.width, height: this.project.height },
+            this.viewport.getTransform(),
+            { width: this.width, height: this.height },
+            true,
+        );
+    }
+
+    private readonly onWheel = (e: TWheelEvent): void => {
+        e.event?.preventDefault();
+        let isImmediate = false;
+        if (Math.abs(e.deltaY) < 0.8) {
+            isImmediate = true;
+        }
+        if (e.event && e.event.ctrlKey && !this.keyListener.isPressed('ctrl')) {
+            isImmediate = true;
+            let factor = 1;
+            if (e.event.deltaMode === 0) {
+                factor = 6;
+            }
+            e.deltaY *= factor;
+        }
+        if (this.keyListener.isPressed('shift')) {
+            e.deltaY /= 4;
+        }
+
+        // zoom
+        const transform = this.targetTransform;
+        const viewportPoint = {
+            x: e.relX,
+            y: e.relY,
+        };
+        const mat = createMatrixFromTransform(transform);
+        const canvasPoint = applyToPoint(inverse(mat), viewportPoint);
+        const newScale = BB.clamp(
+            transform.scale * (1 + 4 / 10) ** -e.deltaY,
+            EASEL_MIN_SCALE,
+            EASEL_MAX_SCALE,
+        );
+        this.setTargetTransform(
+            createTransform(
+                viewportPoint,
+                canvasPoint,
+                newScale,
+                transform.angleDeg,
+                transform.isMirrored,
+            ),
+            isImmediate,
+        );
+    };
+
+    // ----------------------------------- public -----------------------------------
+    constructor(p: TEaselParams<GToolId>) {
+        this.project = p.project;
+        this.width = p.width;
+        this.height = p.height;
+        this.toolId = p.tool;
+        this.toolsMap = { ...p.tools };
+        this.onChangeTool = p.onChangeTool;
+        this.onTransformChange = p.onTransformChange;
+        this.onUndo = p.onUndo;
+        this.onRedo = p.onRedo;
+
+        this.tempTools = Object.fromEntries(
+            TEMP_TRIGGERS.map((trigger) => {
+                return [
+                    trigger,
+                    getToolEntries(this.toolsMap)
+                        .filter(([toolName, tool]) => {
+                            return tool.tempTriggers && tool.tempTriggers.includes(trigger);
+                        })
+                        .map((i) => i[0])[0],
+                ];
+            }),
+        ) as Record<TEaselToolTrigger, GToolId | undefined>;
+
+        this.viewport = new ProjectViewport({
+            width: this.width,
+            height: this.height,
+            project: {
+                width: this.project.width,
+                height: this.project.height,
+                layers: this.project.layers,
+            },
+            transform: this.getResetTransform(),
+            onBeforeRender: p.onBeforeRender,
+            renderAfter: (ctx, renderedTransform) => {
+                const tool = this.getActiveTool();
+                tool.renderAfterViewport?.(ctx, renderedTransform);
+            },
+        });
+        this.targetTransform = this.viewport.getTransform();
+
+        Object.values<TEaselTool>(this.toolsMap).forEach((tool) => {
+            tool.setEaselInterface?.(this.easelInterface);
+            tool.onResize?.(this.width, this.height);
+        });
+
+        let mouseMiddleIsDown = false;
+        let mouseRightIsDown = false;
+
+        let angleIsExtraSticky = false;
+        this.pointerPreprocessor = new EaselPointerPreprocessor({
+            onUndo: this.onUndo,
+            onRedo: this.onRedo,
+            onPinch: (event) => {
+                if (event.type === 'move') {
+                    const transform = this.viewport.getTransform();
+                    if (!this.pinchInitialTransform) {
+                        this.pinchInitialTransform = BB.copyObj(transform);
+                        angleIsExtraSticky = this.pinchInitialTransform.angleDeg % 180 === 0;
+                    }
+
+                    let newAngleDeg =
+                        this.pinchInitialTransform.angleDeg + (event.angleRad / Math.PI) * 180;
+                    newAngleDeg = minimizeAngleDeg(
+                        snapAngleDeg(newAngleDeg, 90, angleIsExtraSticky ? 12 : 4),
+                    );
+                    if (newAngleDeg % 90 !== 0) {
+                        angleIsExtraSticky = false;
+                    }
+
+                    const metaTransform = toMetaTransform(this.pinchInitialTransform, {
+                        x: event.downRelX,
+                        y: event.downRelY,
+                    });
+                    metaTransform.scale = BB.clamp(
+                        this.pinchInitialTransform.scale * event.scale,
+                        EASEL_MIN_SCALE,
+                        EASEL_MAX_SCALE,
+                    );
+                    metaTransform.viewportP.x += event.relX - event.downRelX;
+                    metaTransform.viewportP.y += event.relY - event.downRelY;
+                    metaTransform.angleDeg = newAngleDeg;
+
+                    this.setTargetTransform(
+                        createTransform(
+                            metaTransform.viewportP,
+                            metaTransform.canvasP,
+                            metaTransform.scale,
+                            metaTransform.angleDeg,
+                            metaTransform.isMirrored,
+                        ),
+                        true,
+                    );
+                    this.requestRender();
+                } else if (event.type === 'end') {
+                    this.pinchInitialTransform = undefined;
+                }
+            },
+            onDoubleTap: (e) => {
+                if (this.fitTransform()) {
+                    this.requestRender();
+                } else {
+                    this.scale(2, e.relX, e.relY);
+                }
+            },
+            onChainOut: (e) => {
+                this.cursorPos = {
+                    x: e.relX,
+                    y: e.relY,
+                };
+                if (e.type === 'pointerdown') {
+                    if (e.button === 'middle') {
+                        mouseMiddleIsDown = true;
+                        this.pushTempTool(this.tempTools['mouse-middle']);
+                    }
+                    if (e.button === 'right') {
+                        mouseRightIsDown = true;
+                        this.pushTempTool(this.tempTools['mouse-right']);
+                    }
+                } else if (e.type === 'pointermove') {
+                    // noop?
+                } else if (e.type === 'pointerup') {
+                    if (mouseMiddleIsDown) {
+                        mouseMiddleIsDown = false;
+                        this.getActiveTool().onPointer(e);
+                        this.popTempTool(this.tempTools['mouse-middle']);
+                        return;
+                    }
+                    if (mouseRightIsDown) {
+                        mouseRightIsDown = false;
+                        this.getActiveTool().onPointer(e);
+                        this.popTempTool(this.tempTools['mouse-right']);
+                        return;
+                    }
+                }
+                this.getActiveTool().onPointer(e);
+            },
+        });
+        /*
+        // My trackpad pinching (via PointerListener) doesn't currently work with Safari on macOS.
+        // So I tried GestureListener, which works, but doesn't mesh well with the other event listeners.
+        let lastScale = 0;
+        this.gestureListener = new GestureListener({
+            target: this.viewport.getElement(),
+            onStart: (e) => {
+                lastScale = e.scale;
+            },
+            onChange: (e) => {
+                const deltaScale = e.scale / lastScale;
+                lastScale = e.scale;
+
+                // zoom
+                const transform = this.viewport.getTransform();
+                const viewportPoint = {
+                    x: e.layerX,
+                    y: e.layerY,
+                };
+                const mat = createMatrixFromTransform(transform);
+                const canvasPoint = applyToPoint(inverse(mat), viewportPoint);
+                const newScale = BB.clamp(
+                    transform.scale * deltaScale,
+                    EASEL_MIN_SCALE,
+                    EASEL_MAX_SCALE,
+                );
+                this.setTransform(
+                    createTransform(viewportPoint, canvasPoint, newScale, transform.angleDeg),
+                );
+                this.requestRender();
+            },
+        });*/
+
+        this.pointerListener = new PointerListener({
+            target: this.viewport.getElement(),
+            onPointer: (e) => {
+                this.pointerPreprocessor.chainIn(e);
+            },
+            onWheel: this.onWheel,
+            onEnterLeave: (isOver) => {
+                const tool = this.getActiveTool();
+                if (!isOver) {
+                    this.cursorPos = undefined;
+                    tool.onPointerLeave?.();
+                }
+            },
+            useDirtyWheel: true,
+            isWheelPassive: false,
+            maxPointers: 3, // 3 fingers needed for redo gesture
+        });
+
+        this.windowPointerListener = (e: PointerEvent) => {
+            if (this.isFrozen) {
+                return;
+            }
+            if (!(e.target instanceof Node && this.rootEl.contains(e.target))) {
+                this.getActiveTool().onClickOutside?.();
+            }
+        };
+        window.addEventListener('pointerdown', this.windowPointerListener);
+
+        this.keyListener = new KeyListener({
+            onDown: (keyStr, e, comboStr, isRepeat) => {
+                if (this.isFrozen || BB.isInputFocused(true)) {
+                    return;
+                }
+
+                if (comboStr === 'plus') {
+                    const oldScale = this.getTransform().scale;
+                    const newScale = zoomByStep(
+                        oldScale,
+                        this.keyListener.isPressed('shift') ? 1 / 8 : 1 / 2,
+                    );
+                    this.scale(newScale / oldScale);
+                }
+                if (comboStr === 'minus') {
+                    const oldScale = this.getTransform().scale;
+                    const newScale = zoomByStep(
+                        oldScale,
+                        this.keyListener.isPressed('shift') ? -1 / 8 : -1 / 2,
+                    );
+                    this.scale(newScale / oldScale);
+                }
+                if (
+                    comboStr !== 'shift' &&
+                    this.keyListener.comboOnlyContains(['shift', 'left', 'right', 'up', 'down'])
+                ) {
+                    const arrowKey = comboStr
+                        .split('+')
+                        .find((item) => item !== 'shift')! as TArrowKey;
+                    const activeTool = this.getActiveTool();
+                    if (!activeTool.onArrowKeys?.(arrowKey)) {
+                        const stepSize = 40;
+                        if (arrowKey === 'left') {
+                            this.translate(stepSize, 0);
+                        }
+                        if (arrowKey === 'right') {
+                            this.translate(-stepSize, 0);
+                        }
+                        if (arrowKey === 'up') {
+                            this.translate(0, stepSize);
+                        }
+                        if (arrowKey === 'down') {
+                            this.translate(0, -stepSize);
+                        }
+                    }
+                }
+
+                // activate temporary tool
+                TEMP_TRIGGERS_KEYS.forEach((keyTrigger) => {
+                    if (
+                        comboStr === keyTrigger &&
+                        this.toolsMap[this.toolId].blockTrigger !== keyTrigger
+                    ) {
+                        this.pushTempTool(this.tempTools[keyTrigger]);
+                    }
+                });
+                const tool = this.toolsMap[this.tempToolId ?? this.toolId];
+                tool.onKeyDown?.(keyStr, e, comboStr, isRepeat);
+            },
+            onUp: (keyStr, e, oldComboStr) => {
+                if (this.isFrozen) {
+                    return;
+                }
+
+                // turn off temporary tool again
+                TEMP_TRIGGERS_KEYS.forEach((keyTrigger) => {
+                    if (
+                        keyStr === keyTrigger &&
+                        this.toolsMap[this.toolId].blockTrigger !== keyTrigger
+                    ) {
+                        this.popTempTool(this.tempTools[keyTrigger]);
+                    }
+                });
+                const tool = this.toolsMap[this.tempToolId ?? this.toolId];
+                tool.onKeyUp?.(keyStr, e, oldComboStr);
+            },
+            onBlur: () => {
+                const tool = this.toolsMap[this.tempToolId ?? this.toolId];
+                tool.onBlur?.();
+            },
+        });
+        this.easelInterface.keyListener = this.keyListener;
+
+        this.selectionRenderer = new SelectionRenderer({
+            transform: this.viewport.getTransform(),
+            selection: this.project.selection,
+            width: this.width,
+            height: this.height,
+        });
+
+        this.svgEl = BB.createSvg({
+            elementType: 'svg',
+            width: '' + this.width,
+            height: '' + this.height,
+        });
+        css(this.svgEl, {
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            pointerEvents: 'none',
+        });
+        this.svgEl.append(
+            this.selectionRenderer.getElement(),
+            ...Object.values<TEaselTool>(this.toolsMap).map((item) => item.getSvgElement()),
+        );
+        this.htmlOverlayEl = BB.el({
+            css: {
+                position: 'absolute',
+                left: 0,
+                top: 0,
+            },
+        });
+        this.htmlOverlayEl.append(
+            ...Object.values<TEaselTool>(this.toolsMap)
+                .map((item) => item.getHtmlOverlayElement?.() || undefined)
+                .filter((item) => item !== undefined),
+        );
+        this.updateToolSvgs();
+
+        const createIndicator = (icon: IconName, title: string, onClick: () => void) => {
+            const el = BB.el({
+                content: getIconSvg(icon, { width: 20, height: 20 }),
+                title,
+                onClick,
+                css: {
+                    display: 'none',
+                    padding: 5,
+                    borderRadius: 5,
+                    background: 'var(--canvas-overlay-bg)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                },
+            });
+            // rootEl prevents default on touchend, which would suppress the click
+            el.addEventListener('touchend', (e) => e.stopPropagation());
+            return el;
+        };
+        this.mirrorIndicatorEl = createIndicator('view-flip', LANG('hand-flip'), () =>
+            this.setIsMirrored(false),
+        );
+        this.selectionIndicatorEl = createIndicator(
+            'select-mode-select',
+            LANG('select-deselect'),
+            p.onResetSelection,
+        );
+        this.selectionIndicatorEl.style.display = this.project.selection ? '' : 'none';
+        const indicatorsEl = BB.el({
+            css: {
+                position: 'absolute',
+                left: 5,
+                bottom: 5,
+                display: 'flex',
+                gap: 5,
+                pointerEvents: 'none',
+            },
+        });
+        indicatorsEl.append(this.mirrorIndicatorEl, this.selectionIndicatorEl);
+
+        this.rootEl = c(
+            {
+                css: {
+                    userSelect: 'none',
+                    touchAction: 'none',
+                    overscrollBehaviorX: 'none',
+                },
+            },
+            [this.viewport.getElement(), this.svgEl, this.htmlOverlayEl, indicatorsEl],
+        );
+
+        // prevent contextmenu
+        this.rootEl.addEventListener(
+            'contextmenu',
+            (e) => {
+                e.preventDefault();
+                return false;
+            },
+            { passive: false },
+        );
+
+        // Carried over from old KlCanvasWorkspace. Prevent some default browser behavior. Todo what breaks if removed?
+        this.rootEl.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            return false;
+        });
+        // Carried over from old KlCanvasWorkspace. Prevent some default browser behavior. Todo what breaks if removed?
+        this.rootEl.addEventListener('dragstart', (e) => {
+            e.preventDefault();
+            return false;
+        });
+
+        this.toolsMap[this.toolId].activate?.(this.cursorPos);
+        Object.values<TEaselTool>(this.toolsMap).forEach((tool) => tool.onTool?.(this.toolId));
+        {
+            // adjust the transform without triggering a render
+            const doRender = this.doRender;
+            this.resetOrFitTransform(true);
+            this.doRender = doRender;
+        }
+        this.renderLoop();
+    }
+
+    // update and render
+    setProject(project: TEaselProject): void {
+        this.project = project;
+        this.viewport.setProject({
+            width: this.project.width,
+            height: this.project.height,
+            layers: this.project.layers,
+        });
+        this.selectionRenderer.setSelection(this.project.selection);
+        this.selectionIndicatorEl.style.display = this.project.selection ? '' : 'none';
+        this.getActiveTool().onUpdateSelection?.(this.project.selection);
+        this.requestRender();
+    }
+
+    // update and render
+    setSize(width: number, height: number): void {
+        const m = createMatrixFromTransform(this.viewport.getTransform());
+        const canvasCenterPoint = applyToPoint(inverse(m), {
+            x: this.width / 2,
+            y: this.height / 2,
+        });
+
+        this.width = width;
+        this.height = height;
+        BB.setAttributes(this.svgEl, {
+            width: '' + this.width,
+            height: '' + this.height,
+        });
+        this.selectionRenderer.setSize(width, height);
+        this.getActiveTool().onResize?.(width, height);
+        this.viewport.setSize(width, height);
+        const transform = this.viewport.getTransform();
+        this.setTargetTransform(
+            createTransform(
+                {
+                    x: this.width / 2,
+                    y: this.height / 2,
+                },
+                canvasCenterPoint,
+                transform.scale,
+                transform.angleDeg,
+                transform.isMirrored,
+            ),
+            true,
+        );
+
+        this.requestRender();
+    }
+
+    requestRender(): void {
+        this.doRender = true;
+    }
+
+    getTransform(): TViewportTransform {
+        return this.viewport.getTransform();
+    }
+
+    setTransform(transform: TViewportTransform): void {
+        this.setTargetTransform(transform, true);
+    }
+
+    setTool(toolId: GToolId): void {
+        if (toolId === this.toolId) {
+            return;
+        }
+        this.toolId = toolId;
+        this.toolsMap[this.toolId].activate?.(this.cursorPos);
+        Object.values<TEaselTool>(this.toolsMap).forEach((tool) => tool.onTool?.(this.toolId));
+        this.onChangeTool(toolId);
+        this.updateToolSvgs();
+        this.updateDoubleTapPointerTypes();
+        this.requestRender();
+    }
+
+    getTool(): GToolId {
+        return this.toolId;
+    }
+
+    translate(dX: number, dY: number): void {
+        const transform = this.targetTransform;
+        this.setTargetTransform({
+            ...transform,
+            x: transform.x + dX,
+            y: transform.y + dY,
+        });
+    }
+
+    scale(factor: number, viewportX?: number, viewportY?: number): void {
+        const before = this.targetTransform;
+        const viewportRect = { width: this.width, height: this.height };
+        viewportX = viewportX ?? viewportRect.width / 2;
+        viewportY = viewportY ?? viewportRect.height / 2;
+
+        const metaTransform = toMetaTransform(before, { x: viewportX, y: viewportY });
+        metaTransform.scale = BB.clamp(
+            metaTransform.scale * factor,
+            EASEL_MIN_SCALE,
+            EASEL_MAX_SCALE,
+        );
+
+        this.setTargetTransform(
+            createTransform(
+                metaTransform.viewportP,
+                metaTransform.canvasP,
+                metaTransform.scale,
+                metaTransform.angleDeg,
+                metaTransform.isMirrored,
+            ),
+        );
+    }
+
+    resetTransform(isImmediate?: boolean): void {
+        const transform = this.getResetTransform(this.targetTransform.isMirrored);
+        this.setTargetTransform(transform, isImmediate);
+        this.requestRender();
+    }
+
+    fitTransform(isImmediate?: boolean): boolean {
+        const oldTransform = this.viewport.getTransform();
+        const transform = this.getFitTransform();
+
+        const isPositionChanged = transform.x !== oldTransform.x || transform.y !== oldTransform.y;
+        const isScaleOrAngleChanged =
+            transform.scale !== oldTransform.scale || transform.angleDeg !== oldTransform.angleDeg;
+
+        if (!isPositionChanged && !isScaleOrAngleChanged) {
+            return false;
+        }
+
+        this.setTargetTransform(transform, isImmediate);
+        return true;
+    }
+
+    /**
+     * Automatically decide what is best. E.g. if it's pixel art, Fit might be better.
+     */
+    resetOrFitTransform(isImmediate?: boolean): void {
+        const threshold = 4; // >= 400% zoom. pixelated, not blurry
+        if (
+            !KL_CONFIG.disableAutoFit &&
+            this.project.width <= this.width / threshold &&
+            this.project.height <= this.height / threshold
+        ) {
+            this.fitTransform(isImmediate);
+        } else {
+            this.resetTransform(isImmediate);
+        }
+    }
+
+    setAngleDeg(angleDeg: number, isRelative: undefined | boolean) {
+        const viewportTransform = this.targetTransform;
+        const viewportMat = createMatrixFromTransform(viewportTransform);
+        const viewportRect = { width: this.width, height: this.height };
+        const viewportCenterP = {
+            x: viewportRect.width / 2,
+            y: viewportRect.height / 2,
+        };
+        const newAngleDeg = minimizeAngleDeg(
+            isRelative ? viewportTransform.angleDeg + angleDeg : angleDeg,
+        );
+
+        const newViewportTransform = createTransform(
+            viewportCenterP,
+            applyToPoint(inverse(viewportMat), viewportCenterP),
+            viewportTransform.scale,
+            newAngleDeg,
+            viewportTransform.isMirrored,
+        );
+        this.setTargetTransform(newViewportTransform);
+    }
+
+    setIsMirrored(isMirrored: boolean): void {
+        if (isMirrored === this.getIsMirrored()) {
+            return;
+        }
+        const transform = this.targetTransform;
+        const viewportCenterP = { x: this.width / 2, y: this.height / 2 };
+        this.setTargetTransform(
+            createTransform(
+                viewportCenterP,
+                applyToPoint(inverse(createMatrixFromTransform(transform)), viewportCenterP),
+                transform.scale,
+                minimizeAngleDeg(-transform.angleDeg),
+                isMirrored,
+            ),
+            true,
+        );
+        this.mirrorIndicatorEl.style.display = isMirrored ? '' : 'none';
+    }
+
+    getIsMirrored(): boolean {
+        return this.targetTransform.isMirrored;
+    }
+
+    getIsLocked(): boolean {
+        return this.getActiveTool().getIsLocked?.() ?? false;
+    }
+
+    setIsFrozen(b: boolean): void {
+        this.isFrozen = b;
+    }
+
+    getElement(): HTMLElement {
+        return this.rootEl;
+    }
+
+    destroy(): void {
+        this.viewport.destroy();
+        this.pointerListener.destroy();
+        this.keyListener.destroy();
+        this.animationFrameId !== undefined && cancelAnimationFrame(this.animationFrameId);
+        this.selectionRenderer.destroy();
+        window.removeEventListener('pointerdown', this.windowPointerListener);
+    }
+}

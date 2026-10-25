@@ -1,43 +1,96 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const { sessionSchema, sessionSyncSchema } = require('../lib/validators');
 const Session = require('../models/Session');
 const Project = require('../models/Project');
+const Collab = require('../models/Collab');
+
+// Проверка доступа пользователя к проекту
+async function canAccessProject(userId, projectId) {
+  const project = await Project.findByPk(projectId);
+  if (!project) return { ok: false, status: 404, error: 'Проект не найден' };
+  if (project.UserId === userId || project.visibility === 'PUBLIC') return { ok: true, project };
+  const isCollaborator = await Collab.findOne({
+    where: { projectId, userId, status: 'accepted' },
+  });
+  if (isCollaborator) return { ok: true, project };
+  return { ok: false, status: 403, error: 'Нет доступа к проекту' };
+}
+
+function computeDuration(startTime, endTime) {
+  if (!endTime) return 0;
+  const d = Math.floor((new Date(endTime) - new Date(startTime)) / 1000);
+  return d > 0 ? d : 0;
+}
+
+// Создать или обновить сессию по clientId (идемпотентно)
+async function upsertSession(userId, data) {
+  let session = null;
+  if (data.clientId) {
+    session = await Session.findOne({ where: { userId, clientId: data.clientId } });
+  }
+  const endTime = data.endTime ? new Date(data.endTime) : null;
+  const durationSeconds = computeDuration(data.startTime, endTime);
+
+  if (session) {
+    if (endTime) {
+      session.endTime = endTime;
+      session.durationSeconds = durationSeconds;
+    }
+    if (data.meta) session.meta = { ...(session.meta || {}), ...data.meta };
+    await session.save();
+    return session;
+  }
+
+  return Session.create({
+    userId,
+    projectId: data.projectId,
+    startTime: new Date(data.startTime),
+    endTime,
+    durationSeconds,
+    meta: data.meta || {},
+    clientId: data.clientId || null,
+  });
+}
 
 // POST /api/sessions - создать сессию (старт + стоп или только старт)
 router.post('/', auth, async (req, res) => {
   try {
-    const { projectId, startTime, endTime, meta } = req.body;
-    
-    if (!projectId || !startTime) {
-      return res.status(400).json({ error: 'projectId и startTime обязательны' });
-    }
+    const data = sessionSchema.parse(req.body);
 
-    // Проверяем существование проекта
-    const project = await Project.findByPk(projectId);
-    if (!project) {
-      return res.status(404).json({ error: 'Проект не найден' });
-    }
+    const access = await canAccessProject(req.user.id, data.projectId);
+    if (!access.ok) return res.status(access.status).json({ error: access.error });
 
-    // Вычисляем длительность если есть endTime
-    let durationSeconds = 0;
-    if (endTime) {
-      durationSeconds = Math.floor((new Date(endTime) - new Date(startTime)) / 1000);
-      if (durationSeconds < 0) durationSeconds = 0;
-    }
-
-    const session = await Session.create({
-      userId: req.user.id,
-      projectId,
-      startTime: new Date(startTime),
-      endTime: endTime ? new Date(endTime) : null,
-      durationSeconds,
-      meta: meta || {},
-    });
-
-    res.json(session);
+    const session = await upsertSession(req.user.id, data);
+    res.status(201).json(session);
   } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Ошибка валидации', details: err.errors });
+    }
     console.error('Ошибка создания сессии:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sessions/sync - пакетная синхронизация сессий (оффлайн-очередь)
+router.post('/sync', auth, async (req, res) => {
+  try {
+    const { sessions } = sessionSyncSchema.parse(req.body);
+
+    const saved = [];
+    for (const item of sessions) {
+      const access = await canAccessProject(req.user.id, item.projectId);
+      if (!access.ok) continue;
+      saved.push(await upsertSession(req.user.id, item));
+    }
+
+    res.json({ synced: saved.length, sessions: saved });
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Ошибка валидации', details: err.errors });
+    }
+    console.error('Ошибка синхронизации сессий:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -84,16 +137,14 @@ router.put('/:id/stop', auth, async (req, res) => {
       return res.status(404).json({ error: 'Сессия не найдена' });
     }
 
-    // Проверка что сессия принадлежит пользователю
     if (session.userId !== req.user.id) {
       return res.status(403).json({ error: 'Нет доступа' });
     }
 
     const end = endTime ? new Date(endTime) : new Date();
     session.endTime = end;
-    session.durationSeconds = Math.floor((end - new Date(session.startTime)) / 1000);
-    if (session.durationSeconds < 0) session.durationSeconds = 0;
-    
+    session.durationSeconds = computeDuration(session.startTime, end);
+
     await session.save();
 
     res.json(session);

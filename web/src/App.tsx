@@ -1,255 +1,278 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { io } from "socket.io-client";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LandingPage from "./LandingPage";
 import MainLayout from "./components/layout/MainLayout";
+import FeedPage from "./pages/FeedPage";
+import DiscoverPage from "./pages/DiscoverPage";
 import ProjectsPage from "./pages/ProjectsPage";
-import VersionsPage from "./pages/VersionsPage";
-import CollabsPage from "./pages/CollabsPage";
 import ProfilePage from "./pages/ProfilePage";
-import SessionsPage from "./pages/SessionsPage";
-import AssetsMarketplace from "./pages/AssetsMarketplace";
-import ProjectsGallery from "./pages/ProjectsGallery";
-import type { User, Project, UploadFile } from "./types";
-import "./styles/globals.css";
+import UserProfilePage from "./pages/UserProfilePage";
+import MarketplacePage from "./pages/MarketplacePage";
+import FriendsPage from "./pages/FriendsPage";
+import ChatPage from "./pages/ChatPage";
+import LibraryPage from "./pages/LibraryPage";
+import RoomsPage from "./pages/RoomsPage";
+import RoomPage from "./pages/RoomPage";
+import ChallengesPage from "./pages/ChallengesPage";
+import ChallengePage from "./pages/ChallengePage";
+import AdminModerationPage from "./pages/AdminModerationPage";
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminContentPage from "./pages/admin/AdminContentPage";
+import AdminChallengesPage from "./pages/admin/AdminChallengesPage";
+import AdminAnnouncementsPage from "./pages/admin/AdminAnnouncementsPage";
+import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import ProjectWorkspacePage from "./pages/project/ProjectWorkspacePage";
+import AuthNotice, { type AuthNoticeData } from "./components/ui/AuthNotice";
+import type { Project, SiteSettings, User } from "./types";
+import {
+  api,
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  getSocket,
+  resetSocket,
+} from "./lib/api";
 
-const socket = io("http://localhost:4000");
-
-function App() {
-  // Авторизация
-  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
+export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Данные
   const [projects, setProjects] = useState<Project[]>([]);
-  const [projectId, setProjectId] = useState<number | null>(null);
-  const [media, setMedia] = useState<UploadFile[]>([]);
-
-  // === Проверка токена ===
-  const checkToken = async (t: string | null) => {
-    if (!t) return;
-    try {
-      const res = await fetch("http://localhost:4000/api/auth/me", {
-        headers: { Authorization: `Bearer ${t}` },
-      });
-      if (!res.ok) throw new Error("Token invalid");
-      const data = await res.json();
-      setCurrentUser(data);
-    } catch {
-      logout();
-    }
-  };
-
-  const handleLogin = (t: string) => {
-    localStorage.setItem("token", t);
-    setToken(t);
-    checkToken(t);
-  };
+  const [authNotice, setAuthNotice] = useState<AuthNoticeData | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      api.post("/api/auth/logout", { refreshToken }).catch(() => undefined);
+    }
+    clearTokens();
+    resetSocket();
     setCurrentUser(null);
+    setProjects([]);
   };
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch("http://localhost:4000/api/projects", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          logout();
-          return;
-        }
-        throw new Error(`Ошибка загрузки проектов: ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = await api.get<Project[]>("/api/projects");
       setProjects(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setProjects([]);
     }
   };
 
-  const fetchProjectMedia = async (id: number) => {
-    try {
-      const res = await fetch(
-        `http://localhost:4000/api/projects/${id}/media`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!res.ok) throw new Error("Ошибка загрузки медиа");
-
-      const data = await res.json();
-      setMedia(data);
-    } catch (err) {
-      console.error(err);
-      setMedia([]);
-    }
+  const handleAuthenticated = (user: User) => {
+    setCurrentUser(user);
+    fetchProjects();
   };
 
-  // === Подписка на медиа выбранного проекта ===
+  // Обработка ссылки подтверждения почты (?verify=...) — работает и для залогиненных
   useEffect(() => {
-    if (!projectId) {
-      return;
-    }
-
-    socket.emit("join-project", projectId);
-    fetchProjectMedia(projectId);
-
-    const handleMediaAdded = (newMedia: UploadFile) => {
-      // Проверяем, не добавили ли мы уже этот файл (чтобы избежать дубликатов)
-      setMedia((prev: UploadFile[]) => {
-        const exists = prev.some(m => m.filename === newMedia.filename);
-        if (exists) return prev;
-        return [newMedia, ...prev];
+    const params = new URLSearchParams(window.location.search);
+    const verify = params.get("verify");
+    if (!verify) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    api
+      .post("/api/auth/verify-email", { token: verify })
+      .then(async () => {
+        if (getAccessToken()) {
+          try {
+            const user = await api.get<User>("/api/auth/me");
+            setCurrentUser(user);
+          } catch {
+            /* ignore */
+          }
+        }
+        setAuthNotice({ type: "success", text: "Почта подтверждена" });
+      })
+      .catch((err) => {
+        setAuthNotice({
+          type: "error",
+          text: err instanceof Error ? err.message : "Не удалось подтвердить почту",
+        });
       });
-    };
+  }, []);
 
-    socket.on("media:added", handleMediaAdded);
-
-    return () => {
-      socket.off("media:added", handleMediaAdded);
-    };
-  }, [projectId]);
-
-  // === Загрузка начальных данных ===
+  // Проверка токена при старте
   useEffect(() => {
-    if (token) checkToken(token);
-
-    Promise.all([fetchProjects()]).then(() =>
-      setLoading(false)
-    );
-
-    socket.on("project:created", (project) => {
-      setProjects((prev: Project[]) => [...prev, project]);
-    });
-
+    let active = true;
+    (async () => {
+      if (getAccessToken()) {
+        try {
+          const user = await api.get<User>("/api/auth/me");
+          if (active) setCurrentUser(user);
+        } catch {
+          clearTokens();
+        }
+      }
+      if (active) setLoading(false);
+    })();
     return () => {
-      socket.off("project:created");
+      active = false;
     };
-  }, [token]);
+  }, []);
 
-  // === Загрузка ===
-  if (loading)
+  // Загрузка проектов после входа
+  useEffect(() => {
+    if (!currentUser) return;
+    fetchProjects();
+    const socket = getSocket();
+    const onCreated = (project: Project) => {
+      setProjects((prev) => (prev.some((p) => p.id === project.id) ? prev : [project, ...prev]));
+    };
+    socket.on("project:created", onCreated);
+    socket.on("project:updated", fetchProjects);
+    socket.on("project:deleted", fetchProjects);
+    return () => {
+      socket.off("project:created", onCreated);
+      socket.off("project:updated", fetchProjects);
+      socket.off("project:deleted", fetchProjects);
+    };
+  }, [currentUser]);
+
+  // Публичные настройки сайта (техрежим, баннер, витрина)
+  useEffect(() => {
+    api
+      .get<SiteSettings>("/api/settings/public")
+      .then(setSiteSettings)
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const socket = getSocket();
+    const onSettings = () => {
+      api.get<SiteSettings>("/api/settings/public").then(setSiteSettings).catch(() => undefined);
+    };
+    socket.on("settings:changed", onSettings);
+    return () => {
+      socket.off("settings:changed", onSettings);
+    };
+  }, [currentUser]);
+
+  const noticeEl = <AuthNotice notice={authNotice} onClose={() => setAuthNotice(null)} />;
+
+  if (loading) {
     return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 animate-pulse">Загрузка Distort Studio...</p>
+      <>
+        {noticeEl}
+        <div className="gradient-bg" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ textAlign: "center" }}>
+            <div className="brand-logo" style={{ margin: "0 auto 1rem", width: 52, height: 52, fontSize: 22 }}>D</div>
+            <p className="text-text-secondary">Загрузка Distort Studio…</p>
+          </div>
         </div>
-      </div>
+      </>
     );
-
-  // === Если не авторизован - показываем лендинг ===
-  if (!token || !currentUser) {
-    return <LandingPage onLogin={handleLogin} />;
   }
 
-  // === Основной интерфейс с роутингом ===
+  const isAdmin = currentUser?.role === "admin";
+  const maintenanceOn = siteSettings?.maintenance?.enabled ?? false;
+  if (maintenanceOn && !isAdmin) {
+    if (!currentUser && showAdminLogin) {
+      return (
+        <>
+          {noticeEl}
+          <LandingPage onAuthenticated={handleAuthenticated} />
+        </>
+      );
+    }
+    return (
+      <>
+        {noticeEl}
+        <div className="maintenance-screen gradient-bg">
+          <div className="brand-logo">D</div>
+          <h1 className="page-title">Техническое обслуживание</h1>
+          <p className="text-text-secondary" style={{ maxWidth: 420 }}>
+            Скоро вернёмся — мы обновляем Distort Studio.
+          </p>
+          {!currentUser ? (
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowAdminLogin(true)}>
+              Вход для администратора
+            </button>
+          ) : (
+            <button className="btn btn-secondary btn-sm" onClick={logout}>
+              Выйти
+            </button>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <>
+        {noticeEl}
+        <LandingPage onAuthenticated={handleAuthenticated} />
+      </>
+    );
+  }
+
   return (
     <BrowserRouter>
+      {noticeEl}
       <MainLayout
         currentUser={currentUser}
+        projects={projects}
         logout={logout}
+        announcement={siteSettings?.announcement ?? null}
+        maintenance={maintenanceOn}
       >
         <Routes>
-          <Route
-            path="/"
-            element={
-              <ProjectsGallery
-                token={token}
-                currentUser={currentUser}
-              />
-            }
-          />
+          <Route path="/" element={<FeedPage currentUser={currentUser} />} />
+          <Route path="/discover" element={<DiscoverPage />} />
           <Route
             path="/projects"
             element={
               <ProjectsPage
-                token={token}
-                currentUser={currentUser}
                 projects={projects}
                 setProjects={setProjects}
-                projectId={projectId}
-                setProjectId={setProjectId}
-                media={media}
-                setMedia={setMedia}
+                refreshProjects={fetchProjects}
               />
             }
           />
           <Route
-            path="/versions"
+            path="/projects/:id/:tab?"
             element={
-              <VersionsPage
-                token={token}
-                projects={projects}
-                projectId={projectId}
-                setProjectId={setProjectId}
-              />
-            }
-          />
-          <Route
-            path="/collabs"
-            element={
-              <CollabsPage
-                token={token}
+              <ProjectWorkspacePage
                 currentUser={currentUser}
                 projects={projects}
-                projectId={projectId}
-                setProjectId={setProjectId}
+                refreshProjects={fetchProjects}
               />
             }
           />
+          <Route path="/profile" element={<ProfilePage currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
+          <Route path="/u/:id" element={<UserProfilePage currentUserId={currentUser.id} />} />
+          <Route path="/friends" element={<FriendsPage />} />
+          <Route path="/music" element={<LibraryPage />} />
+          <Route path="/rooms" element={<RoomsPage />} />
+          <Route path="/rooms/:id" element={<RoomPage currentUser={currentUser} />} />
+          <Route path="/challenges" element={<ChallengesPage />} />
+          <Route path="/challenges/:id" element={<ChallengePage />} />
+          <Route path="/chat" element={<ChatPage currentUser={currentUser} />} />
+          <Route path="/marketplace" element={<MarketplacePage currentUser={currentUser} />} />
           <Route
-            path="/profile"
-            element={
-              <ProfilePage
-                token={token}
-                currentUser={currentUser}
-                setCurrentUser={setCurrentUser}
-              />
-            }
-          />
-          <Route
-            path="/sessions"
-            element={
-              <SessionsPage
-                token={token}
-                projects={projects}
-              />
-            }
-          />
-          <Route
-            path="/marketplace"
-            element={
-              <AssetsMarketplace
-                token={token}
-                currentUser={currentUser}
-              />
-            }
-          />
-          <Route
-            path="/gallery"
-            element={
-              <ProjectsGallery
-                token={token}
-                currentUser={currentUser}
-              />
-            }
-          />
+            path="/admin"
+            element={isAdmin ? <AdminLayout /> : <Navigate to="/" replace />}
+          >
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="content" element={<AdminContentPage />} />
+            <Route path="reports" element={<AdminModerationPage />} />
+            <Route path="challenges" element={<AdminChallengesPage />} />
+            <Route path="announcements" element={<AdminAnnouncementsPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
+          </Route>
+          <Route path="/admin/moderation" element={<Navigate to="/admin/reports" replace />} />
+          <Route path="/versions" element={<Navigate to="/projects" replace />} />
+          <Route path="/collabs" element={<Navigate to="/projects" replace />} />
+          <Route path="/sessions" element={<Navigate to="/projects" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </MainLayout>
     </BrowserRouter>
   );
 }
-
-export default App;

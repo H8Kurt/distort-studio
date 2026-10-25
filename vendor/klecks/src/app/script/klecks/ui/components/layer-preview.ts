@@ -1,0 +1,353 @@
+import { BB } from '../../../bb/bb';
+import { changeCanvasDimensions } from '../../../bb/base/change-canvas-dimensions';
+import { LANG } from '../../../language/language';
+import { TSize2D } from '../../../bb/bb-types';
+import { THEME } from '../../../theme/theme';
+import { css } from '../../../bb/base/base';
+import { KlCanvas, TKlCanvasLayer } from '../../canvas/kl-canvas';
+import { KlHistory } from '../../history/kl-history';
+import { getIconSvg } from '../../../icon/icon';
+import { FloatingLayerPreview } from './floating-layer-preview';
+
+/**
+ * Previews currently active layer
+ * thumbnail (hover shows bigger preview), layer name, opacity
+ *
+ * internally listens to kl history. updates when there's a change.
+ * but you need to update it when the active layer changed. (different canvas object)
+ *
+ * update visibility for performance
+ */
+export class LayerPreview {
+    private readonly rootEl: HTMLElement;
+    private readonly contentWrapperEl: HTMLElement;
+    private height: number;
+    private readonly klHistory: KlHistory;
+    private readonly klCanvas: KlCanvas;
+    private isPreviewVisible: boolean;
+    private floatingLayerPreview: FloatingLayerPreview;
+
+    private readonly checkEl: HTMLInputElement;
+
+    private readonly clippingIconEl: SVGSVGElement;
+    private readonly nameWrapperEl: HTMLElement;
+    private readonly nameLabelEl: HTMLElement;
+    private readonly opacityEl: HTMLElement;
+    private lastDrawnSize: TSize2D;
+
+    private canvasSize: number;
+    private readonly canvas: HTMLCanvasElement;
+    private readonly canvasCtx: CanvasRenderingContext2D;
+    private readonly canvasWrapperEl: HTMLElement;
+    private isSmall: boolean;
+
+    private readonly largeCanvasSize: number;
+    private readonly largeCanvas: HTMLCanvasElement;
+    private readonly largeCanvasCtx: CanvasRenderingContext2D;
+
+    private updateClippingIconColor(): void {
+        this.clippingIconEl.style.color = THEME.isDark() ? '#ccc' : 'var(--kl-color)';
+    }
+
+    private getLayer(): TKlCanvasLayer {
+        const composed = this.klHistory.getComposed();
+        const layerId = composed.activeLayerId;
+        return this.klCanvas.getLayer(composed.layerMap[layerId].index);
+    }
+
+    /**
+     * is always instant
+     */
+    private drawLargeCanvas(): void {
+        const layer = this.getLayer();
+        if (!layer) {
+            return;
+        }
+        const layerCanvas = layer.canvas;
+
+        const canvasDimensions = BB.fitInto(
+            layerCanvas.width,
+            layerCanvas.height,
+            this.largeCanvasSize,
+            this.largeCanvasSize,
+            1,
+        );
+        const newWidth = Math.round(canvasDimensions.width);
+        const newHeight = Math.round(canvasDimensions.height);
+        changeCanvasDimensions(this.largeCanvas, newWidth, newHeight, { ensureCleared: true });
+        this.largeCanvasCtx.save();
+        if (this.largeCanvas.width > layerCanvas.width) {
+            this.largeCanvasCtx.imageSmoothingEnabled = false;
+        } else {
+            this.largeCanvasCtx.imageSmoothingEnabled = true;
+            this.largeCanvasCtx.imageSmoothingQuality = 'high';
+        }
+        this.largeCanvasCtx.drawImage(
+            layerCanvas,
+            0,
+            0,
+            this.largeCanvas.width,
+            this.largeCanvas.height,
+        );
+        this.largeCanvasCtx.restore();
+    }
+
+    private updateLabel(): void {
+        const layer = this.getLayer();
+        if (!this.isPreviewVisible || !layer) {
+            return;
+        }
+
+        const layerIsVisible = layer.isVisible;
+        this.checkEl.parentElement!.title = layerIsVisible
+            ? LANG('layers-active-layer-visible')
+            : LANG('layers-active-layer-hidden');
+        this.checkEl.checked = layerIsVisible;
+        this.checkEl.style.boxShadow = layerIsVisible ? '' : '0 0 0 1px red';
+
+        this.clippingIconEl.style.display = layer.hasClipping ? '' : 'none';
+        css(this.nameWrapperEl, {
+            paddingLeft: layer.hasClipping ? 21 : 10,
+        });
+
+        this.nameLabelEl.textContent = layer.name;
+        if (layer.isVisible) {
+            this.opacityEl.innerHTML =
+                LANG('opacity') + '<br>' + Math.round(layer.opacity * 100) + '%';
+        } else {
+            this.opacityEl.innerHTML =
+                LANG('opacity') + '<br><s>' + Math.round(layer.opacity * 100) + '%</s>';
+        }
+    }
+
+    private draw(): void {
+        const layer = this.getLayer();
+        if (!this.isPreviewVisible || !layer) {
+            return;
+        }
+        this.updateLabel();
+
+        const layerCanvas = layer.canvas;
+
+        const canvasDimensions = BB.fitInto(
+            layerCanvas.width,
+            layerCanvas.height,
+            this.canvasSize,
+            this.canvasSize,
+            1,
+        );
+        changeCanvasDimensions(
+            this.canvas,
+            Math.round(canvasDimensions.width),
+            Math.round(canvasDimensions.height),
+            { ensureCleared: true },
+        );
+
+        this.canvasCtx.save();
+        this.canvasCtx.imageSmoothingEnabled = false;
+        this.canvasCtx.drawImage(layerCanvas, 0, 0, this.canvas.width, this.canvas.height);
+        this.canvasCtx.restore();
+
+        this.lastDrawnSize.width = layerCanvas.width;
+        this.lastDrawnSize.height = layerCanvas.height;
+    }
+
+    // ----------------------------------- public -----------------------------------
+    constructor(p: {
+        onClick: () => void; // when clicking on layer name
+        klRootEl: HTMLElement;
+        floatingLayerPreview: FloatingLayerPreview;
+        klHistory: KlHistory;
+        klCanvas: KlCanvas;
+    }) {
+        // syncs via updateLayer, and internally updates layer opacity via a hack
+
+        this.rootEl = BB.el({
+            className: 'kl-layer-preview',
+        });
+        this.klHistory = p.klHistory;
+        this.klCanvas = p.klCanvas;
+        this.floatingLayerPreview = p.floatingLayerPreview;
+        this.isPreviewVisible = true;
+        this.isSmall = false;
+        this.height = 40;
+        this.canvasSize = this.height - 10;
+        this.largeCanvasSize = 300;
+        this.lastDrawnSize = {
+            width: 0,
+            height: 0,
+        };
+        // --- setup dom ---
+        this.contentWrapperEl = BB.el({
+            css: {
+                display: 'flex',
+                alignItems: 'center',
+                height: this.height,
+            },
+        });
+
+        const checkWrapper = BB.el({
+            css: {
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                width: 23,
+                flexShrink: 0,
+            },
+        });
+        this.checkEl = BB.el({
+            parent: checkWrapper,
+            tagName: 'input',
+            css: {
+                pointerEvents: 'none',
+            },
+            props: {
+                type: 'checkbox',
+                disabled: true,
+                name: 'layer-visible',
+            },
+        });
+
+        this.canvasWrapperEl = BB.el({
+            css: {
+                //background: '#f00',
+                minWidth: this.height,
+                height: this.height,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+            },
+        });
+        this.canvas = BB.canvas(this.canvasSize, this.canvasSize);
+        this.canvasCtx = BB.ctx(this.canvas);
+        this.canvas.title = LANG('layers-active-layer');
+        const nameWrapper = (this.nameWrapperEl = BB.el({
+            css: {
+                //background: '#ff0',
+                flexGrow: 1,
+                paddingLeft: 10,
+                fontSize: 13,
+                overflow: 'hidden',
+                position: 'relative',
+            },
+        }));
+        this.clippingIconEl = getIconSvg('layer-clipping', {
+            position: 'absolute',
+            left: 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 16,
+            height: 16,
+            display: 'none',
+        });
+        nameWrapper.append(this.clippingIconEl);
+        this.nameLabelEl = BB.el({
+            content: '',
+            css: {
+                float: 'left',
+                whiteSpace: 'nowrap',
+            },
+        });
+        const clickableEl = BB.el({
+            css: {
+                // background: 'rgba(0,255,0,0.6)',
+                position: 'absolute',
+                left: 10,
+                top: 0,
+                width: 90,
+                height: '100%',
+            },
+        });
+
+        this.clippingIconEl.addEventListener('click', () => p.onClick(), { passive: false });
+        clickableEl.addEventListener('click', () => p.onClick(), { passive: false });
+        this.canvas.addEventListener('click', () => p.onClick(), { passive: false });
+        checkWrapper.addEventListener('click', () => p.onClick(), { passive: false });
+
+        this.opacityEl = BB.el({
+            content: LANG('opacity') + '<br>100%',
+            css: {
+                minWidth: 60,
+                fontSize: 12,
+                textAlign: 'center',
+            },
+        });
+
+        this.largeCanvas = BB.canvas(this.largeCanvasSize, this.largeCanvasSize);
+        this.largeCanvasCtx = BB.ctx(this.largeCanvas);
+
+        this.canvasWrapperEl.append(this.canvas);
+        nameWrapper.append(this.nameLabelEl, clickableEl);
+        this.contentWrapperEl.append(checkWrapper, this.canvasWrapperEl, nameWrapper, this.opacityEl);
+        this.rootEl.append(this.contentWrapperEl);
+
+        this.updateClippingIconColor();
+        THEME.addIsDarkListener(() => {
+            this.updateClippingIconColor();
+        });
+
+        let previousLayerId = '';
+        let timeout: number | undefined;
+        this.klHistory.addListener(() => {
+            // label should update instantly
+            this.updateLabel();
+            const activeLayerId = this.klHistory.getComposed().activeLayerId;
+            if (activeLayerId !== previousLayerId) {
+                // layer changed, draw instantly
+                this.draw();
+                timeout = undefined;
+            } else {
+                // layer didn't change, can update slowly
+                timeout ??= setTimeout(() => {
+                    timeout = undefined;
+                    this.draw();
+                }, 500);
+            }
+            previousLayerId = activeLayerId;
+        });
+
+        const pointerListener = new BB.PointerListener({
+            target: this.canvas,
+            onEnterLeave: (b) => {
+                if (b) {
+                    this.drawLargeCanvas();
+                    const bounds = this.rootEl.getBoundingClientRect();
+                    this.floatingLayerPreview.show(this.largeCanvas, bounds.top + this.height / 2);
+                } else {
+                    this.floatingLayerPreview.hide();
+                }
+            },
+        });
+
+        this.draw();
+    }
+
+    // ---- interface ----
+
+    getElement(): HTMLElement {
+        return this.rootEl;
+    }
+
+    setIsVisible(b: boolean): void {
+        if (this.isPreviewVisible === b) {
+            return;
+        }
+        this.isPreviewVisible = b;
+        this.contentWrapperEl.style.display = this.isPreviewVisible ? 'flex' : 'none';
+        this.rootEl.style.marginBottom = this.isPreviewVisible ? '' : '10px';
+        this.draw();
+    }
+
+    setIsSmall(b: boolean): void {
+        if (this.isSmall === b) {
+            return;
+        }
+        this.isSmall = b;
+        this.height = b ? 36 : 40;
+        this.canvasSize = this.height - 10;
+        this.contentWrapperEl.style.height = `${this.height}px`;
+        this.canvasWrapperEl.style.minWidth = `${this.height}px`;
+        this.canvasWrapperEl.style.height = `${this.height}px`;
+        this.draw();
+    }
+}
